@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tausi Brand Sheet</title>
+<style>
+  :root {
+    --tausi-royal: #721398;
+    --tausi-orchid: #9751B2;
+    --tausi-plum: #45065A;
+    --tausi-aubergine: #2A0B36;
+    --tausi-night: #110411;
+    --tausi-lilac: #CDB8D2;
+    --tausi-peacock: #197EB0;
+    --tausi-feather: #549753;
+    --tausi-gold: #B0944D;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 16px 64px; background: var(--tausi-night); color: var(--tausi-lilac);
+         font: 15px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { font-weight: 300; letter-spacing: .4em; font-size: 32px; margin: 0 0 4px; }
+  h2 { font-weight: 500; font-size: 13px; letter-spacing: .15em; text-transform: uppercase; opacity: .7; margin: 40px 0 12px; }
+  p { margin: 0; opacity: .75; }
+  .logos { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .logo { aspect-ratio: 1; border-radius: 12px; display: grid; place-items: center; padding: 24px; }
+  .logo i { width: 100%; height: 100%; background: var(--fg);
+            -webkit-mask: url(tausi-emblem.svg) center / contain no-repeat; mask: url(tausi-emblem.svg) center / contain no-repeat; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .sw { border-radius: 12px; overflow: hidden; background: #1c0a22; }
+  .sw div { height: 88px; }
+  .sw span { display: block; padding: 8px 12px; font-size: 13px; }
+  .sw b { display: block; font-weight: 600; }
+  code { font-family: ui-monospace, monospace; }
+  .lockup { background: linear-gradient(180deg, var(--tausi-plum), var(--tausi-aubergine)); border-radius: 12px;
+            padding: 32px 16px; text-align: center; }
+  .lockup i { display: inline-block; width: 160px; height: 160px; background: var(--tausi-lilac);
+              -webkit-mask: url(tausi-emblem.svg) center / contain no-repeat; mask: url(tausi-emblem.svg) center / contain no-repeat; }
+  .lockup .word { font-family: "Cinzel", Georgia, serif; font-size: 48px; letter-spacing: .35em; margin: 8px 0 0 .35em; }
+  .lockup .tag { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; opacity: .85; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TAUSI</h1>
+  <p>Brand colours and peacock emblem sampled from the Premium pack.</p>
+
+  <h2>Emblem</h2>
+  <div class="logos">
+    <div class="logo" style="background:var(--tausi-plum);--fg:var(--tausi-lilac)"><i></i></div>
+    <div class="logo" style="background:var(--tausi-royal);--fg:#fff"><i></i></div>
+    <div class="logo" style="background:var(--tausi-lilac);--fg:var(--tausi-plum)"><i></i></div>
+    <div class="logo" style="background:#fff;--fg:var(--tausi-royal)"><i></i></div>
+  </div>
+
+  <h2>Lockup preview</h2>
+  <div class="lockup">
+    <i></i>
+    <div class="word">TAUSI</div>
+    <div class="tag">Beauty from within</div>
+  </div>
+
+  <h2>Core palette</h2>
+  <div class="swatches">
+    <div class="sw"><div style="background:var(--tausi-royal)"></div><span><b>Royal Purple</b><code>#721398</code> · primary, "Premium" tab</span></div>
+    <div class="sw"><div style="background:var(--tausi-orchid)"></div><span><b>Orchid</b><code>#9751B2</code> · highlight, wave sheen</span></div>
+    <div class="sw"><div style="background:var(--tausi-plum)"></div><span><b>Deep Plum</b><code>#45065A</code> · pack body</span></div>
+    <div class="sw"><div style="background:var(--tausi-aubergine)"></div><span><b>Aubergine</b><code>#2A0B36</code> · shadow, top panel</span></div>
+    <div class="sw"><div style="background:var(--tausi-night);outline:1px solid #333"></div><span><b>Night</b><code>#110411</code> · near-black pill</span></div>
+    <div class="sw"><div style="background:var(--tausi-lilac)"></div><span><b>Silver Lilac</b><code>#CDB8D2</code> · emblem, wordmark</span></div>
+  </div>
+
+  <h2>Peacock accents</h2>
+  <div class="swatches">
+    <div class="sw"><div style="background:var(--tausi-peacock)"></div><span><b>Peacock Blue</b><code>#197EB0</code></span></div>
+    <div class="sw"><div style="background:var(--tausi-feather)"></div><span><b>Feather Green</b><code>#549753</code></span></div>
+    <div class="sw"><div style="background:var(--tausi-gold)"></div><span><b>Feather Gold</b><code>#B0944D</code></span></div>
+  </div>
+</main>
+</body>
+</html>
