@@ -1,0 +1,70 @@
+# Every name Docker creates (containers, the default network, the db-data
+# volume) is prefixed with the Compose project name, COMPOSE_PROJECT_NAME from
+# .env, so projects made from this template run side by side. Only host ports
+# are shared: PORT, DB_PORT and STUDIO_PORT in .env (`npm run configure`
+# picks free ones). Inside the network the app listens on 3000 and Postgres on 5432.
+services:
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    image: ${COMPOSE_PROJECT_NAME:-web-starter}
+    env_file: .env
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-}
+    ports:
+      - "${PORT:-3000}:3000"
+    healthcheck:
+      # /login renders without a session; busybox wget ships with the image.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/login || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # The dev server compiles the page on the first request.
+      start_period: 90s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Brings the database schema up to date, then exits; web waits for it.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    image: ${COMPOSE_PROJECT_NAME:-web-starter}-migrate
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      DB_SCHEMA: ${DB_SCHEMA:-public}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/db:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db-data:

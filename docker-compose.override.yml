@@ -1,0 +1,48 @@
+# Development overrides. Docker Compose loads this file automatically next to
+# docker-compose.yml, so `docker compose up` runs the dev setup: `next dev` in
+# the container with the source bind-mounted for hot reload. For the
+# production build, name the base file alone: `docker compose -f docker-compose.yml up`.
+services:
+  web:
+    build:
+      target: dev
+    image: ${COMPOSE_PROJECT_NAME:-web-starter}-dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      # Keep the container's own Linux node_modules and build cache instead of
+      # the host's; -V on `up` refreshes them after dependency changes.
+      - /app/node_modules
+      - /app/.next
+    restart: "no"
+
+  # Prisma Studio, on demand: `docker compose up studio`, then open
+  # http://localhost:5555 (or STUDIO_PORT from .env). COMPOSE_PROFILES=tools in
+  # .env starts it with every `docker compose up`. Studio only listens
+  # inside its container, so docker/studio-forward.mjs publishes it.
+  studio:
+    build:
+      context: .
+      target: dev
+    image: ${COMPOSE_PROJECT_NAME:-web-starter}-dev
+    profiles: [tools]
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      DB_HOST: db
+      DB_PORT: 5432
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-}
+      STUDIO_PORT: ${STUDIO_PORT:-5555}
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      # The same port inside and out: Studio checks the Origin's port.
+      - "${STUDIO_PORT:-5555}:${STUDIO_PORT:-5555}"
+    command: >-
+      sh -c "node docker/studio-forward.mjs &
+      exec node_modules/.bin/prisma studio --port $$STUDIO_PORT --browser none"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
