@@ -1,4 +1,4 @@
-# Web Starter
+# tausi
 
 A Next.js starter with Postgres, Prisma, email and password accounts, organizations with roles, and invitations.
 

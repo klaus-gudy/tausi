@@ -8,7 +8,7 @@
         "run",
         "dev"
       ],
-      "port": 3000
+      "port": 3031
     },
     {
       "name": "studio",
@@ -17,7 +17,7 @@
         "run",
         "db:studio"
       ],
-      "port": 5555
+      "port": 5556
     }
   ]
 }
