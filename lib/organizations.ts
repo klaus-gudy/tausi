@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto"
 
 import type { Prisma } from "@/lib/generated/prisma/client"
+import { seedPlaces } from "@/lib/places"
 import { getPrisma } from "@/lib/prisma"
 
 export const MAX_ORGANIZATION_NAME = 100
@@ -30,10 +31,14 @@ export function uniqueSlug(name: string) {
   return `${base || "workspace"}-${randomBytes(3).toString("hex")}`
 }
 
-/** Creates an organization with the user as its owner. Run inside a transaction. */
+/**
+ * Creates an organization with the user as its owner, and with Tanzania's
+ * zones, regions and districts when withPlaces is set. Run inside a
+ * transaction.
+ */
 export async function createOrganizationWithOwner(
   tx: Prisma.TransactionClient,
-  { name, userId }: { name: string; userId: string }
+  { name, userId, withPlaces }: { name: string; userId: string; withPlaces: boolean }
 ) {
   const owner = await tx.role.findFirstOrThrow({
     where: { organizationId: null, key: "owner" },
@@ -46,5 +51,6 @@ export async function createOrganizationWithOwner(
   await tx.membership.create({
     data: { organizationId: organization.id, userId, roleId: owner.id },
   })
+  if (withPlaces) await seedPlaces(tx, organization.id)
   return organization
 }
