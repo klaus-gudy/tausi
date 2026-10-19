@@ -77,7 +77,7 @@ export async function lockProducts(
   const [products, sums] = await Promise.all([
     tx.product.findMany({
       where: { id: { in: rows.map((row) => row.id) } },
-      select: { id: true, name: true, unit: true, archivedAt: true },
+      select: { id: true, name: true, archivedAt: true },
     }),
     tx.stockMovement.groupBy({
       by: ["productId"],
