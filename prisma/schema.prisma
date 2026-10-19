@@ -42,6 +42,7 @@ model User {
   authAccounts         AuthAccount[]
   sessions             Session[]
   verificationTokens   VerificationToken[]
+  stockMovements       StockMovement[]
 
   @@map("users")
 }
@@ -130,11 +131,14 @@ model Organization {
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
 
-  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  roles       Role[]
-  memberships Membership[]
-  invitations Invitation[]
-  sessions    Session[]
+  createdBy      User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  roles          Role[]
+  memberships    Membership[]
+  invitations    Invitation[]
+  sessions       Session[]
+  products       Product[]
+  superDealers   SuperDealer[]
+  stockMovements StockMovement[]
 
   @@unique([name], map: "organizations_name_key", where: raw("deleted_at IS NULL"))
   @@map("organizations")
@@ -249,6 +253,112 @@ model Invitation {
   @@index([email])
   @@index([roleId])
   @@map("invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------
+
+// What the organization stocks. Quantities are whole numbers of `unit`;
+// prices are whole amounts in the organization's currency. Stock on hand is
+// not stored here: it is the sum of the product's stock movements.
+model Product {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  // Unique among the organization's products, ignoring case.
+  sku            String    @db.Citext
+  name           String
+  description    String?
+  unit           String    @default("piece")
+  price          Int       @default(0)
+  // Stock at or below this is shown as low; null turns the warning off.
+  reorderLevel   Int?      @map("reorder_level")
+  // Archived products keep their history but can't be received or issued.
+  archivedAt     DateTime? @map("archived_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stockMovements StockMovement[]
+
+  @@unique([organizationId, sku])
+  @@map("products")
+}
+
+// The shops and distributors stock is issued to: where it leaves the store.
+model SuperDealer {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  // Unique among the organization's dealers, ignoring case.
+  name           String    @db.Citext
+  contactPerson  String?   @map("contact_person")
+  phone          String?
+  email          String?   @db.Citext
+  region         String?
+  address        String?
+  notes          String?
+  // Inactive dealers keep their history but can't be issued stock.
+  deactivatedAt  DateTime? @map("deactivated_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stockMovements StockMovement[]
+
+  @@unique([organizationId, name])
+  @@map("super_dealers")
+}
+
+enum StockMovementType {
+  // In from a supplier.
+  received
+  // Out to a super dealer.
+  issued
+  // A correction after a count, damage or loss; either direction.
+  adjustment
+  // Cancels an earlier movement with the opposite quantity.
+  reversal
+
+  @@map("stock_movement_type")
+}
+
+// The stock ledger. Rows are never edited or deleted: a mistake is undone by
+// a reversal row, so the history always explains the current balance.
+model StockMovement {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  productId      String            @map("product_id") @db.Uuid
+  type           StockMovementType
+  // Signed: positive adds stock, negative removes it.
+  quantity       Int
+  // Cost per unit paid to the supplier, for received stock.
+  unitCost       Int?              @map("unit_cost")
+  superDealerId  String?           @map("super_dealer_id") @db.Uuid
+  // Supplier name for received stock.
+  supplier       String?
+  // Delivery note, invoice or dispatch number.
+  reference      String?
+  note           String?
+  // The day it happened, which may be before it was recorded.
+  occurredOn     DateTime          @map("occurred_on") @db.Date
+  // The movement this one reverses; each can be reversed once.
+  reversesId     String?           @unique @map("reverses_id") @db.Uuid
+  createdById    String?           @map("created_by_id") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // NoAction, not Restrict: deleting an organization cascades through its
+  // dealers and movements together (see Membership.role).
+  superDealer  SuperDealer?   @relation(fields: [superDealerId], references: [id], onDelete: NoAction)
+  reverses     StockMovement? @relation("StockReversal", fields: [reversesId], references: [id], onDelete: NoAction)
+  reversedBy   StockMovement? @relation("StockReversal")
+  createdBy    User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, occurredOn])
+  @@index([productId])
+  @@index([superDealerId])
+  @@map("stock_movements")
 }
 
 // ---------------------------------------------------------------------------
