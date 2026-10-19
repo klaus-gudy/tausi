@@ -77,7 +77,6 @@ async function SuperDealers({
         regionKey: true,
         districtKey: true,
         address: true,
-        notes: true,
         region: { select: { name: true, zone: { select: { name: true } } } },
         district: { select: { name: true } },
       },
