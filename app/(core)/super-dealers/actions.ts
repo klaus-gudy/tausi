@@ -18,6 +18,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * Adds a super dealer, or edits one when the form carries its id. Every field
  * is optional, but a dealer needs a shop name or a contact name, and a phone
  * or an email. The region and district are picked from the seeded lists.
+ * Notes aren't in the form, so saving leaves any a dealer already has.
  */
 export async function saveSuperDealer(
   _previous: ActionResult,
@@ -56,7 +57,6 @@ export async function saveSuperDealer(
     regionKey,
     districtKey,
     address: readText(formData.get("address"), 300),
-    notes: readText(formData.get("notes"), 1000),
   };
   const organizationId = member.organization.id;
   const name = dealerName(data);
