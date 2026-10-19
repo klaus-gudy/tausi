@@ -200,7 +200,11 @@ export async function signUp(
       if (!(await claimInvitation(tx, invitation, userId))) throw new InvitationGone();
       return { userId, organizationId: invitation.organization.id };
     }
-    const organization = await createOrganizationWithOwner(tx, { name: organizationName, userId });
+    const organization = await createOrganizationWithOwner(tx, {
+      name: organizationName,
+      userId,
+      withPlaces: formData.get("withPlaces") === "on",
+    });
     return { userId, organizationId: organization.id };
   }).catch((error: unknown) => {
     if (error instanceof InvitationGone) return "gone" as const;
