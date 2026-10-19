@@ -28,7 +28,6 @@ import {
   NativeSelectOptGroup,
   NativeSelectOption,
 } from "@/components/ui/native-select";
-import { Textarea } from "@/components/ui/textarea";
 import { useFormAction } from "@/hooks/use-form-action";
 import { formatPhone, type PlaceZone } from "@/lib/dealers";
 import type { ActionResult } from "@/lib/inventory";
@@ -42,7 +41,6 @@ export type EditableDealer = {
   regionKey: string | null;
   districtKey: string | null;
   address: string | null;
-  notes: string | null;
 };
 
 const initialState: ActionResult = { message: "" };
@@ -231,16 +229,6 @@ function DealerForm({
             placeholder="Mtaa wa Msimbazi, Kariakoo"
             autoComplete="off"
             maxLength={300}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="dealer-notes">Notes</FieldLabel>
-          <Textarea
-            id="dealer-notes"
-            name="notes"
-            defaultValue={dealer?.notes ?? ""}
-            maxLength={1000}
-            rows={2}
           />
         </Field>
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
