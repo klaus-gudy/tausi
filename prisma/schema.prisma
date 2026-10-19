@@ -140,6 +140,7 @@ model Organization {
   sessions       Session[]
   products       Product[]
   superDealers   SuperDealer[]
+  warehouses     Warehouse[]
   stockMovements StockMovement[]
   zones          Zone[]
   regions        Region[]
@@ -330,6 +331,41 @@ model SuperDealer {
   @@map("super_dealers")
 }
 
+// Where the organization keeps its stock. Stock isn't tracked per warehouse
+// yet; this records where each one is and roughly how much it holds.
+model Warehouse {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  // Unique among the organization's warehouses, ignoring case.
+  name           String    @db.Citext
+  // The zone comes from the region.
+  regionKey      String?   @map("region_key")
+  // Must be in the region.
+  districtKey    String?   @map("district_key")
+  // Street, area or landmark within the district.
+  address        String?
+  // An estimate, in capacityUnit; see lib/warehouses.ts for the units.
+  capacity       Int?
+  capacityUnit   String    @default("units") @map("capacity_unit")
+  // The storekeeper or manager to call.
+  contactName    String?   @map("contact_name")
+  // Stored as +255754123456; see lib/dealers.ts.
+  phone          String?
+  // Inactive warehouses are kept for the record but hidden from the main list.
+  deactivatedAt  DateTime? @map("deactivated_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Places are the organization's own, so the keys pair with organizationId.
+  region       Region?      @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
+  district     District?    @relation(fields: [organizationId, regionKey, districtKey], references: [organizationId, regionKey, key], onDelete: NoAction)
+
+  @@unique([organizationId, name])
+  @@index([organizationId, regionKey])
+  @@map("warehouses")
+}
+
 enum StockMovementType {
   // In from a supplier.
   received
@@ -414,6 +450,7 @@ model Region {
   zone         Zone          @relation(fields: [organizationId, zoneKey], references: [organizationId, key], onDelete: NoAction)
   districts    District[]
   superDealers SuperDealer[]
+  warehouses   Warehouse[]
 
   @@id([organizationId, key])
   @@index([organizationId, zoneKey])
@@ -430,6 +467,7 @@ model District {
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   region       Region        @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
   superDealers SuperDealer[]
+  warehouses   Warehouse[]
 
   @@id([organizationId, regionKey, key])
   @@map("districts")
