@@ -93,6 +93,7 @@ function ProductForm({
   onSaved: () => void;
 }) {
   const [name, setName] = useState(product?.name ?? "");
+  const [size, setSize] = useState(product?.size ?? "");
   const [state, onSubmit, pending] = useFormAction(
     async (previous: ActionResult, formData: FormData) => {
       const result = await saveProduct(previous, formData);
@@ -130,9 +131,9 @@ function ProductForm({
           <FieldDescription>
             Code:{" "}
             <span className="font-mono text-foreground">
-              {product ? product.code : productCode(name) || "—"}
+              {product ? product.code : productCode(name, size) || "—"}
             </span>
-            {product ? " (stays the same if you rename it)" : " (made from the name)"}
+            {product ? " (stays the same if you rename it)" : " (made from the name and size)"}
           </FieldDescription>
         </Field>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -141,7 +142,8 @@ function ProductForm({
             <Input
               id="product-size"
               name="size"
-              defaultValue={product?.size ?? ""}
+              value={size}
+              onChange={(event) => setSize(event.target.value)}
               placeholder="1L"
               autoComplete="off"
               maxLength={30}
