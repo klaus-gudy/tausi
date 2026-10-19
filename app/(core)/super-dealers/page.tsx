@@ -94,7 +94,7 @@ async function SuperDealers({
       where: { organizationId, type: "issued" },
       _max: { occurredOn: true },
     }),
-    canManage ? readPlaces() : [],
+    canManage ? readPlaces(organizationId) : [],
   ]);
   dealers.sort(byDealerName);
   const issued = new Map(issuedTotals.map((row) => [row.superDealerId, 0 - (row._sum.quantity ?? 0)]));
