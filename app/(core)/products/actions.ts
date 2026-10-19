@@ -15,8 +15,8 @@ import { productCode, uniqueProductCode } from "@/lib/product-code";
 
 /**
  * Adds a product, or edits one when the form carries its id. The code is
- * generated from the name when the product is added and never changes after,
- * so it stays the same on paperwork when the product is renamed.
+ * generated from the name and size when the product is added and never
+ * changes after, so paperwork stays right when the product is renamed or resized.
  */
 export async function saveProduct(
   _previous: ActionResult,
@@ -43,7 +43,7 @@ export async function saveProduct(
     const { count } = await prisma.product.updateMany({ where: { id, organizationId }, data });
     if (!count) return { message: "That product no longer exists." };
   } else {
-    const base = productCode(name);
+    const base = productCode(name, size);
     if (!base) return { message: "Give the product a name with letters or digits." };
     const taken = await prisma.product.findMany({
       where: { organizationId, code: { startsWith: base } },
