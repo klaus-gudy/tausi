@@ -17,17 +17,14 @@ import {
 } from "@/components/ui/dialog";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  NativeSelect,
-  NativeSelectOptGroup,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { useFormAction } from "@/hooks/use-form-action";
 import { formatPhone, type PlaceZone } from "@/lib/dealers";
 import type { ActionResult } from "@/lib/inventory";
@@ -65,7 +62,7 @@ export function AddDealerDialog({ places }: { places: PlaceZone[] }) {
           Add dealer
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
         <DealerForm key={formKey} places={places} onSaved={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
@@ -86,7 +83,7 @@ export function EditDealerDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
         {open ? <DealerForm dealer={dealer} places={places} onSaved={() => onOpenChange(false)} /> : null}
       </DialogContent>
     </Dialog>
@@ -102,6 +99,10 @@ function DealerForm({
   places: PlaceZone[];
   onSaved: () => void;
 }) {
+  // The zone isn't stored; it only narrows the region list.
+  const [zoneKey, setZoneKey] = useState(
+    () => places.find((zone) => zone.regions.some((region) => region.key === dealer?.regionKey))?.key ?? ""
+  );
   const [regionKey, setRegionKey] = useState(dealer?.regionKey ?? "");
   const [state, onSubmit, pending] = useFormAction(
     async (previous: ActionResult, formData: FormData) => {
@@ -115,7 +116,7 @@ function DealerForm({
     initialState
   );
 
-  const zone = places.find((zone) => zone.regions.some((region) => region.key === regionKey));
+  const zone = places.find((zone) => zone.key === zoneKey);
   const region = zone?.regions.find((region) => region.key === regionKey);
 
   return (
@@ -123,114 +124,141 @@ function DealerForm({
       <DialogHeader>
         <DialogTitle>{dealer ? "Edit dealer" : "Add a super dealer"}</DialogTitle>
         <DialogDescription>
-          A shop or distributor you issue stock to. Give a shop or contact name, and a phone or
-          email.
+          A shop or distributor you issue stock to. Give a shop name, a contact name, or both.
         </DialogDescription>
       </DialogHeader>
       {dealer ? <input type="hidden" name="id" value={dealer.id} /> : null}
-      <FieldGroup className="py-4">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="dealer-shop">Shop name</FieldLabel>
-            <Input
-              id="dealer-shop"
-              name="shopName"
-              defaultValue={dealer?.shopName ?? ""}
-              placeholder="Kariakoo General Store"
-              autoComplete="off"
-              maxLength={200}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dealer-contact">Contact name</FieldLabel>
-            <Input
-              id="dealer-contact"
-              name="contactName"
-              defaultValue={dealer?.contactName ?? ""}
-              placeholder="Neema Mushi"
-              autoComplete="off"
-              maxLength={200}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dealer-phone">Phone</FieldLabel>
-            <Input
-              id="dealer-phone"
-              name="phone"
-              type="tel"
-              defaultValue={dealer?.phone ? formatPhone(dealer.phone) : ""}
-              placeholder="0754 123 456"
-              autoComplete="off"
-              maxLength={40}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dealer-email">Email</FieldLabel>
-            <Input
-              id="dealer-email"
-              name="email"
-              type="email"
-              defaultValue={dealer?.email ?? ""}
-              placeholder="mauzo@kariakoostore.co.tz"
-              autoComplete="off"
-              maxLength={200}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dealer-region">Region</FieldLabel>
-            <NativeSelect
-              id="dealer-region"
-              name="regionKey"
-              value={regionKey}
-              onChange={(event) => setRegionKey(event.target.value)}
-              className="w-full"
-            >
-              <NativeSelectOption value="">No region</NativeSelectOption>
-              {places.map((zone) => (
-                <NativeSelectOptGroup key={zone.key} label={zone.name}>
-                  {zone.regions.map((region) => (
-                    <NativeSelectOption key={region.key} value={region.key}>
-                      {region.name}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelectOptGroup>
-              ))}
-            </NativeSelect>
-            {zone ? <FieldDescription>{zone.name}</FieldDescription> : null}
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dealer-district">District</FieldLabel>
-            {/* Remounted per region so a district from another region is cleared. */}
-            <NativeSelect
-              key={regionKey}
-              id="dealer-district"
-              name="districtKey"
-              defaultValue={regionKey === dealer?.regionKey ? (dealer.districtKey ?? "") : ""}
-              className="w-full"
-              disabled={!region}
-            >
-              <NativeSelectOption value="">
-                {region ? "No district" : "Pick a region first"}
-              </NativeSelectOption>
-              {region?.districts.map((district) => (
-                <NativeSelectOption key={district.key} value={district.key}>
-                  {district.name}
+      <FieldGroup className="gap-6 py-4">
+        <FieldSet className="gap-3">
+          <FieldLegend className="mb-0">Basic details</FieldLegend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="dealer-shop">Shop name</FieldLabel>
+              <Input
+                id="dealer-shop"
+                name="shopName"
+                defaultValue={dealer?.shopName ?? ""}
+                placeholder="Kariakoo General Store"
+                autoComplete="off"
+                maxLength={200}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="dealer-contact">Contact name</FieldLabel>
+              <Input
+                id="dealer-contact"
+                name="contactName"
+                defaultValue={dealer?.contactName ?? ""}
+                placeholder="Neema Mushi"
+                autoComplete="off"
+                maxLength={200}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="dealer-phone">Phone</FieldLabel>
+              <Input
+                id="dealer-phone"
+                name="phone"
+                type="tel"
+                defaultValue={dealer?.phone ? formatPhone(dealer.phone) : ""}
+                placeholder="0754 123 456"
+                autoComplete="off"
+                maxLength={40}
+                required
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="dealer-email">
+                Email <span className="font-normal text-muted-foreground">(optional)</span>
+              </FieldLabel>
+              <Input
+                id="dealer-email"
+                name="email"
+                type="email"
+                defaultValue={dealer?.email ?? ""}
+                placeholder="mauzo@kariakoostore.co.tz"
+                autoComplete="off"
+                maxLength={200}
+              />
+            </Field>
+          </div>
+        </FieldSet>
+        <FieldSet className="gap-3">
+          <FieldLegend className="mb-0">Location</FieldLegend>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="dealer-zone">Zone</FieldLabel>
+              <NativeSelect
+                id="dealer-zone"
+                value={zoneKey}
+                onChange={(event) => {
+                  setZoneKey(event.target.value);
+                  setRegionKey("");
+                }}
+                className="w-full"
+              >
+                <NativeSelectOption value="">No zone</NativeSelectOption>
+                {places.map((zone) => (
+                  <NativeSelectOption key={zone.key} value={zone.key}>
+                    {zone.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="dealer-region">Region</FieldLabel>
+              <NativeSelect
+                id="dealer-region"
+                name="regionKey"
+                value={regionKey}
+                onChange={(event) => setRegionKey(event.target.value)}
+                className="w-full"
+                disabled={!zone}
+              >
+                <NativeSelectOption value="">
+                  {zone ? "No region" : "Pick a zone first"}
                 </NativeSelectOption>
-              ))}
-            </NativeSelect>
+                {zone?.regions.map((region) => (
+                  <NativeSelectOption key={region.key} value={region.key}>
+                    {region.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="dealer-district">District</FieldLabel>
+              {/* Remounted per region so a district from another region is cleared. */}
+              <NativeSelect
+                key={regionKey}
+                id="dealer-district"
+                name="districtKey"
+                defaultValue={regionKey === dealer?.regionKey ? (dealer.districtKey ?? "") : ""}
+                className="w-full"
+                disabled={!region}
+              >
+                <NativeSelectOption value="">
+                  {region ? "No district" : "Pick a region first"}
+                </NativeSelectOption>
+                {region?.districts.map((district) => (
+                  <NativeSelectOption key={district.key} value={district.key}>
+                    {district.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+          </div>
+          <Field>
+            <FieldLabel htmlFor="dealer-address">Address</FieldLabel>
+            <Input
+              id="dealer-address"
+              name="address"
+              defaultValue={dealer?.address ?? ""}
+              placeholder="Mtaa wa Msimbazi, Kariakoo"
+              autoComplete="off"
+              maxLength={300}
+            />
           </Field>
-        </div>
-        <Field>
-          <FieldLabel htmlFor="dealer-address">Address</FieldLabel>
-          <Input
-            id="dealer-address"
-            name="address"
-            defaultValue={dealer?.address ?? ""}
-            placeholder="Mtaa wa Msimbazi, Kariakoo"
-            autoComplete="off"
-            maxLength={300}
-          />
-        </Field>
+        </FieldSet>
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
