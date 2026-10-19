@@ -55,16 +55,11 @@ const navGroups = [
     ],
   },
   {
-    label: "Dealers",
-    items: [
-      { title: "Super dealers", href: "/super-dealers", icon: Store },
-      { title: "Zones", href: "/zones", icon: MapPinned },
-    ],
-  },
-  {
     label: "Catalogue",
     items: [
       { title: "Products", href: "/products", icon: Package },
+      { title: "Super dealers", href: "/super-dealers", icon: Store },
+      { title: "Zones", href: "/zones", icon: MapPinned },
       { title: "Warehouses", href: "/warehouses", icon: Warehouse },
     ],
   },
