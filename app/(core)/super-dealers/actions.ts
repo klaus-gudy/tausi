@@ -17,8 +17,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /**
  * Adds a super dealer, or edits one when the form carries its id. A dealer
  * needs a phone, and a shop name or a contact name; the rest is optional. The
- * region and district are picked from the seeded lists. Notes aren't in the
- * form, so saving leaves any a dealer already has.
+ * region and district are picked from the organization's places. Notes aren't
+ * in the form, so saving leaves any a dealer already has.
  */
 export async function saveSuperDealer(
   _previous: ActionResult,
@@ -41,11 +41,14 @@ export async function saveSuperDealer(
   if (email && !EMAIL.test(email)) return { message: "Enter a valid email address, or leave it empty." };
 
   const prisma = getPrisma();
+  const organizationId = member.organization.id;
   // A district is only found in its own region, so finding it checks both.
   if (regionKey) {
     const found = districtKey
-      ? await prisma.district.findUnique({ where: { regionKey_key: { regionKey, key: districtKey } } })
-      : await prisma.region.findUnique({ where: { key: regionKey } });
+      ? await prisma.district.findUnique({
+          where: { organizationId_regionKey_key: { organizationId, regionKey, key: districtKey } },
+        })
+      : await prisma.region.findUnique({ where: { organizationId_key: { organizationId, key: regionKey } } });
     if (!found) return { message: districtKey ? "Pick a district in that region." : "Pick the region from the list." };
   }
 
@@ -58,7 +61,6 @@ export async function saveSuperDealer(
     districtKey,
     address: readText(formData.get("address"), 300),
   };
-  const organizationId = member.organization.id;
   const name = dealerName(data);
   try {
     if (id) {
