@@ -87,7 +87,7 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
     prisma.product.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, sku: true, unit: true, reorderLevel: true },
+      select: { id: true, name: true, code: true, size: true },
     }),
     permissions.has("stock.issue")
       ? prisma.superDealer.findMany({
@@ -141,7 +141,7 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
 function OnHand({
   products,
 }: {
-  products: { id: string; name: string; sku: string; unit: string; reorderLevel: number | null; onHand: number }[];
+  products: { id: string; name: string; code: string; size: string | null; onHand: number }[];
 }) {
   if (!products.length) {
     return (
@@ -166,37 +166,25 @@ function OnHand({
           <TableHeader>
             <TableRow>
               <TableHead>Product</TableHead>
-              <TableHead className="hidden sm:table-cell">Unit</TableHead>
-              <TableHead className="hidden text-right sm:table-cell">Reorder level</TableHead>
+              <TableHead className="hidden sm:table-cell">Size</TableHead>
               <TableHead className="text-right">On hand</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products.map((product) => {
-              const low = product.reorderLevel !== null && product.onHand <= product.reorderLevel;
-              return (
-                <TableRow key={product.id}>
-                  <TableCell>
-                    <div className="font-medium">{product.name}</div>
-                    <div className="text-xs text-muted-foreground">{product.sku}</div>
-                  </TableCell>
-                  <TableCell className="hidden text-muted-foreground sm:table-cell">
-                    {product.unit}
-                  </TableCell>
-                  <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">
-                    {product.reorderLevel === null ? "—" : formatCount(product.reorderLevel)}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {low ? (
-                      <Badge variant="destructive" className="mr-2">
-                        Low
-                      </Badge>
-                    ) : null}
-                    {formatCount(product.onHand)}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {products.map((product) => (
+              <TableRow key={product.id}>
+                <TableCell>
+                  <div className="font-medium">{product.name}</div>
+                  <div className="text-xs text-muted-foreground">{product.code}</div>
+                </TableCell>
+                <TableCell className="hidden text-muted-foreground sm:table-cell">
+                  {product.size ?? "—"}
+                </TableCell>
+                <TableCell className="text-right font-medium tabular-nums">
+                  {formatCount(product.onHand)}
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </CardContent>
@@ -243,7 +231,7 @@ async function Movements({
       reference: true,
       note: true,
       occurredOn: true,
-      product: { select: { name: true, unit: true } },
+      product: { select: { name: true } },
       superDealer: { select: { name: true } },
       createdBy: { select: { name: true, email: true } },
       reversedBy: { select: { id: true } },
@@ -293,7 +281,7 @@ async function Movements({
                     {counterpart}
                     {movement.unitCost !== null ? (
                       <div className="text-xs text-muted-foreground">
-                        {formatCount(movement.unitCost)} per {movement.product.unit}
+                        {formatCount(movement.unitCost)} each
                       </div>
                     ) : null}
                   </TableCell>
