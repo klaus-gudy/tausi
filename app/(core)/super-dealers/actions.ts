@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { dealerName, normalizePhone } from "@/lib/dealers";
 import {
   isUniqueViolation,
   memberWith,
@@ -13,7 +14,11 @@ import { getPrisma } from "@/lib/prisma";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Adds a super dealer, or edits one when the form carries its id. */
+/**
+ * Adds a super dealer, or edits one when the form carries its id. Every field
+ * is optional, but a dealer needs a shop name or a contact name, and a phone
+ * or an email. The region and district are picked from the seeded lists.
+ */
 export async function saveSuperDealer(
   _previous: ActionResult,
   formData: FormData
@@ -22,22 +27,39 @@ export async function saveSuperDealer(
   if (!member) return notAllowed;
 
   const id = readText(formData.get("id"));
-  const name = readText(formData.get("name"));
+  const shopName = readText(formData.get("shopName"));
+  const contactName = readText(formData.get("contactName"));
+  const typedPhone = readText(formData.get("phone"), 40);
+  const phone = typedPhone ? normalizePhone(typedPhone) : null;
   const email = readText(formData.get("email"))?.toLowerCase() ?? null;
-  if (!name) return { message: "Enter the dealer's name." };
+  const regionKey = readText(formData.get("regionKey"), 100);
+  const districtKey = regionKey ? readText(formData.get("districtKey"), 100) : null;
+  if (!shopName && !contactName) return { message: "Enter a shop name, a contact name, or both." };
+  if (typedPhone && !phone) return { message: "Enter a phone number like 0754 123 456, or leave it empty." };
   if (email && !EMAIL.test(email)) return { message: "Enter a valid email address, or leave it empty." };
+  if (!phone && !email) return { message: "Enter a phone number, an email, or both." };
+
+  const prisma = getPrisma();
+  // A district is only found in its own region, so finding it checks both.
+  if (regionKey) {
+    const found = districtKey
+      ? await prisma.district.findUnique({ where: { regionKey_key: { regionKey, key: districtKey } } })
+      : await prisma.region.findUnique({ where: { key: regionKey } });
+    if (!found) return { message: districtKey ? "Pick a district in that region." : "Pick the region from the list." };
+  }
 
   const data = {
-    name,
+    shopName,
+    contactName,
+    phone,
     email,
-    contactPerson: readText(formData.get("contactPerson")),
-    phone: readText(formData.get("phone"), 40),
-    region: readText(formData.get("region"), 100),
+    regionKey,
+    districtKey,
     address: readText(formData.get("address"), 300),
     notes: readText(formData.get("notes"), 1000),
   };
-  const prisma = getPrisma();
   const organizationId = member.organization.id;
+  const name = dealerName(data);
   try {
     if (id) {
       const { count } = await prisma.superDealer.updateMany({ where: { id, organizationId }, data });
@@ -46,7 +68,7 @@ export async function saveSuperDealer(
       await prisma.superDealer.create({ data: { ...data, organizationId } });
     }
   } catch (error) {
-    if (isUniqueViolation(error)) return { message: `There's already a dealer called ${name}.` };
+    if (isUniqueViolation(error)) return { message: `There's already a dealer called ${shopName}.` };
     throw error;
   }
 

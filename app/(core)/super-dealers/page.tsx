@@ -26,8 +26,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
+import { byDealerName, dealerName, formatPhone } from "@/lib/dealers";
 import { formatCount, formatDay } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
+import { readPlaces } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -63,19 +65,21 @@ async function SuperDealers({
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [dealers, activeCount, inactiveCount, issuedTotals, lastIssues] = await Promise.all([
+  const [dealers, activeCount, inactiveCount, issuedTotals, lastIssues, places] = await Promise.all([
     prisma.superDealer.findMany({
       where: { organizationId, deactivatedAt: tab === "inactive" ? { not: null } : null },
-      orderBy: { name: "asc" },
       select: {
         id: true,
-        name: true,
-        contactPerson: true,
+        shopName: true,
+        contactName: true,
         phone: true,
         email: true,
-        region: true,
+        regionKey: true,
+        districtKey: true,
         address: true,
         notes: true,
+        region: { select: { name: true, zone: { select: { name: true } } } },
+        district: { select: { name: true } },
       },
     }),
     prisma.superDealer.count({ where: { organizationId, deactivatedAt: null } }),
@@ -91,7 +95,9 @@ async function SuperDealers({
       where: { organizationId, type: "issued" },
       _max: { occurredOn: true },
     }),
+    canManage ? readPlaces() : [],
   ]);
+  dealers.sort(byDealerName);
   const issued = new Map(issuedTotals.map((row) => [row.superDealerId, 0 - (row._sum.quantity ?? 0)]));
   const lastIssued = new Map(lastIssues.map((row) => [row.superDealerId, row._max.occurredOn]));
 
@@ -102,7 +108,7 @@ async function SuperDealers({
         { value: "active", label: "Active", count: activeCount },
         { value: "inactive", label: "Inactive", count: inactiveCount },
       ]}
-      actions={canManage ? { active: <AddDealerDialog /> } : undefined}
+      actions={canManage ? { active: <AddDealerDialog places={places} /> } : undefined}
     >
       <TabsContent value={tab}>
         {dealers.length ? (
@@ -113,7 +119,7 @@ async function SuperDealers({
                   <TableRow>
                     <TableHead>Dealer</TableHead>
                     <TableHead className="hidden md:table-cell">Contact</TableHead>
-                    <TableHead className="hidden sm:table-cell">Region</TableHead>
+                    <TableHead className="hidden sm:table-cell">Location</TableHead>
                     <TableHead className="text-right">Units issued</TableHead>
                     <TableHead className="hidden text-right sm:table-cell">Last issue</TableHead>
                     {canManage ? (
@@ -126,22 +132,32 @@ async function SuperDealers({
                 <TableBody>
                   {dealers.map((dealer) => {
                     const last = lastIssued.get(dealer.id);
+                    const { region, district, ...editable } = dealer;
                     return (
                       <TableRow key={dealer.id}>
                         <TableCell>
-                          <div className="font-medium">{dealer.name}</div>
+                          <div className="font-medium">{dealerName(dealer)}</div>
                           {dealer.address ? (
                             <div className="text-xs text-muted-foreground">{dealer.address}</div>
                           ) : null}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          <div>{dealer.contactPerson ?? "—"}</div>
+                          <div>{dealer.shopName ? (dealer.contactName ?? "—") : null}</div>
                           <div className="text-xs text-muted-foreground">
-                            {[dealer.phone, dealer.email].filter(Boolean).join(" · ")}
+                            {[dealer.phone && formatPhone(dealer.phone), dealer.email]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </div>
                         </TableCell>
-                        <TableCell className="hidden text-muted-foreground sm:table-cell">
-                          {dealer.region ?? "—"}
+                        <TableCell className="hidden sm:table-cell">
+                          {region ? (
+                            <>
+                              <div>{[district?.name, region.name].filter(Boolean).join(", ")}</div>
+                              <div className="text-xs text-muted-foreground">{region.zone.name}</div>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatCount(issued.get(dealer.id) ?? 0)}
@@ -151,7 +167,7 @@ async function SuperDealers({
                         </TableCell>
                         {canManage ? (
                           <TableCell>
-                            <DealerMenu dealer={dealer} inactive={tab === "inactive"} />
+                            <DealerMenu dealer={editable} places={places} inactive={tab === "inactive"} />
                           </TableCell>
                         ) : null}
                       </TableRow>
@@ -178,7 +194,7 @@ async function SuperDealers({
             </EmptyHeader>
             {tab === "active" && canManage ? (
               <EmptyContent>
-                <AddDealerDialog />
+                <AddDealerDialog places={places} />
               </EmptyContent>
             ) : null}
           </Empty>

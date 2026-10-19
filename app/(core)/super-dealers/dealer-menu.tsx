@@ -13,8 +13,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { dealerName, type PlaceZone } from "@/lib/dealers";
 
-export function DealerMenu({ dealer, inactive }: { dealer: EditableDealer; inactive: boolean }) {
+export function DealerMenu({
+  dealer,
+  places,
+  inactive,
+}: {
+  dealer: EditableDealer;
+  places: PlaceZone[];
+  inactive: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -25,7 +34,7 @@ export function DealerMenu({ dealer, inactive }: { dealer: EditableDealer; inact
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`Options for ${dealer.name}`}
+            aria-label={`Options for ${dealerName(dealer)}`}
             disabled={pending}
           >
             <MoreHorizontal />
@@ -47,7 +56,7 @@ export function DealerMenu({ dealer, inactive }: { dealer: EditableDealer; inact
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <EditDealerDialog dealer={dealer} open={editing} onOpenChange={setEditing} />
+      <EditDealerDialog dealer={dealer} places={places} open={editing} onOpenChange={setEditing} />
     </>
   );
 }
