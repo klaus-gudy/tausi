@@ -1,12 +1,12 @@
-// Product codes are made from the name so anyone can read them:
-// "Sunflower oil 1L" becomes "SUNFLOWER-OIL-1L". Shared by the add-product
+// Product codes are made from the name and size so anyone can read them:
+// "Sunflower oil" in "1L" becomes "SUNFLOWER-OIL-1L". Shared by the add-product
 // form, which previews it, and the action, which saves it.
 
 const MAX_LENGTH = 40
 
-/** The code for a product name, or "" when the name has no letters or digits. */
-export function productCode(name: string) {
-  return name
+/** The code for a product, or "" when its name and size have no letters or digits. */
+export function productCode(name: string, size?: string | null) {
+  return `${name} ${size ?? ""}`
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase()
