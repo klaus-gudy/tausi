@@ -141,6 +141,9 @@ model Organization {
   products       Product[]
   superDealers   SuperDealer[]
   stockMovements StockMovement[]
+  zones          Zone[]
+  regions        Region[]
+  districts      District[]
 
   @@unique([name], map: "organizations_name_key", where: raw("deleted_at IS NULL"))
   @@map("organizations")
@@ -317,12 +320,13 @@ model SuperDealer {
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  region         Region?         @relation(fields: [regionKey], references: [key], onDelete: Restrict)
-  district       District?       @relation(fields: [regionKey, districtKey], references: [regionKey, key], onDelete: Restrict)
+  // Places are the organization's own, so the keys pair with organizationId.
+  region         Region?         @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
+  district       District?       @relation(fields: [organizationId, regionKey, districtKey], references: [organizationId, regionKey, key], onDelete: NoAction)
   stockMovements StockMovement[]
 
   @@unique([organizationId, shopName])
-  @@index([regionKey])
+  @@index([organizationId, regionKey])
   @@map("super_dealers")
 }
 
@@ -379,45 +383,55 @@ model StockMovement {
 }
 
 // ---------------------------------------------------------------------------
-// Places (global, seeded by migrations)
+// Places (per organization)
 // ---------------------------------------------------------------------------
 
-// Tanzania's sales zones, regions and districts, so dealers pick a place from
-// a list instead of typing it. Keys are slugs of the names: "coastal",
-// "dar-es-salaam", "kinondoni".
+// Each organization's sales zones, regions and districts, so dealers pick a
+// place from a list instead of typing it. A new organization can start from
+// Tanzania's (lib/tanzania-places.ts). Keys are slugs of the names, unique
+// within the organization: "coastal", "dar-es-salaam", "kinondoni".
 model Zone {
-  key      String   @id
-  name     String
+  organizationId String @map("organization_id") @db.Uuid
+  key            String
+  name           String
   // Order in lists, roughly coast first and Zanzibar last.
-  position Int      @db.SmallInt
-  regions  Region[]
+  position       Int    @db.SmallInt
 
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  regions      Region[]
+
+  @@id([organizationId, key])
   @@map("zones")
 }
 
 model Region {
-  key          String        @id
-  zoneKey      String        @map("zone_key")
-  name         String
+  organizationId String @map("organization_id") @db.Uuid
+  key            String
+  zoneKey        String @map("zone_key")
+  name           String
 
-  zone         Zone          @relation(fields: [zoneKey], references: [key], onDelete: Restrict)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  zone         Zone          @relation(fields: [organizationId, zoneKey], references: [organizationId, key], onDelete: NoAction)
   districts    District[]
   superDealers SuperDealer[]
 
-  @@index([zoneKey])
+  @@id([organizationId, key])
+  @@index([organizationId, zoneKey])
   @@map("regions")
 }
 
 // Unique within its region only.
 model District {
-  regionKey    String        @map("region_key")
-  key          String
-  name         String
+  organizationId String @map("organization_id") @db.Uuid
+  regionKey      String @map("region_key")
+  key            String
+  name           String
 
-  region       Region        @relation(fields: [regionKey], references: [key], onDelete: Restrict)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  region       Region        @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
   superDealers SuperDealer[]
 
-  @@id([regionKey, key])
+  @@id([organizationId, regionKey, key])
   @@map("districts")
 }
 
