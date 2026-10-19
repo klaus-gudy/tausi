@@ -13,6 +13,7 @@ import {
   readWholeNumber,
   type ActionResult,
 } from "@/lib/inventory";
+import { dealerName } from "@/lib/dealers";
 import { formatCount } from "@/lib/format";
 import { getPrisma } from "@/lib/prisma";
 
@@ -127,10 +128,10 @@ export async function issueStock(
   const result = await getPrisma().$transaction(async (tx): Promise<ActionResult> => {
     const dealer = await tx.superDealer.findFirst({
       where: { id: superDealerId, organizationId },
-      select: { name: true, deactivatedAt: true },
+      select: { shopName: true, contactName: true, deactivatedAt: true },
     });
     if (!dealer) return { message: "That dealer no longer exists." };
-    if (dealer.deactivatedAt) return { message: `${dealer.name} is inactive. Reactivate them first.` };
+    if (dealer.deactivatedAt) return { message: `${dealerName(dealer)} is inactive. Reactivate them first.` };
 
     const products = await lockProducts(tx, organizationId, [...wanted.keys()]);
     if (products.length !== wanted.size) return { message: "One of those products no longer exists." };
@@ -158,7 +159,7 @@ export async function issueStock(
       })),
     });
     const units = [...wanted.values()].reduce((sum, quantity) => sum + quantity, 0);
-    return { success: true, message: `Issued ${plural(units, "unit")} to ${dealer.name}.` };
+    return { success: true, message: `Issued ${plural(units, "unit")} to ${dealerName(dealer)}.` };
   });
 
   if (result.success) revalidateInventory();

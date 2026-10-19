@@ -293,15 +293,22 @@ model Product {
 }
 
 // The shops and distributors stock is issued to: where it leaves the store.
+// Every field is optional, but a dealer needs a shop name or a contact name,
+// and a phone or an email (checked in the database too).
 model SuperDealer {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   // Unique among the organization's dealers, ignoring case.
-  name           String    @db.Citext
-  contactPerson  String?   @map("contact_person")
+  shopName       String?   @map("shop_name") @db.Citext
+  contactName    String?   @map("contact_name")
+  // Stored as +255754123456; see lib/dealers.ts.
   phone          String?
   email          String?   @db.Citext
-  region         String?
+  // The zone comes from the region.
+  regionKey      String?   @map("region_key")
+  // Must be in the region.
+  districtKey    String?   @map("district_key")
+  // Street, area or landmark within the district.
   address        String?
   notes          String?
   // Inactive dealers keep their history but can't be issued stock.
@@ -310,9 +317,12 @@ model SuperDealer {
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  region         Region?         @relation(fields: [regionKey], references: [key], onDelete: Restrict)
+  district       District?       @relation(fields: [regionKey, districtKey], references: [regionKey, key], onDelete: Restrict)
   stockMovements StockMovement[]
 
-  @@unique([organizationId, name])
+  @@unique([organizationId, shopName])
+  @@index([regionKey])
   @@map("super_dealers")
 }
 
@@ -366,6 +376,49 @@ model StockMovement {
   @@index([productId])
   @@index([superDealerId])
   @@map("stock_movements")
+}
+
+// ---------------------------------------------------------------------------
+// Places (global, seeded by migrations)
+// ---------------------------------------------------------------------------
+
+// Tanzania's sales zones, regions and districts, so dealers pick a place from
+// a list instead of typing it. Keys are slugs of the names: "coastal",
+// "dar-es-salaam", "kinondoni".
+model Zone {
+  key      String   @id
+  name     String
+  // Order in lists, roughly coast first and Zanzibar last.
+  position Int      @db.SmallInt
+  regions  Region[]
+
+  @@map("zones")
+}
+
+model Region {
+  key          String        @id
+  zoneKey      String        @map("zone_key")
+  name         String
+
+  zone         Zone          @relation(fields: [zoneKey], references: [key], onDelete: Restrict)
+  districts    District[]
+  superDealers SuperDealer[]
+
+  @@index([zoneKey])
+  @@map("regions")
+}
+
+// Unique within its region only.
+model District {
+  regionKey    String        @map("region_key")
+  key          String
+  name         String
+
+  region       Region        @relation(fields: [regionKey], references: [key], onDelete: Restrict)
+  superDealers SuperDealer[]
+
+  @@id([regionKey, key])
+  @@map("districts")
 }
 
 // ---------------------------------------------------------------------------

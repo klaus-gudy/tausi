@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
 import type { StockMovementType } from "@/lib/generated/prisma/client";
+import { byDealerName, dealerName } from "@/lib/dealers";
 import { formatCount, formatDay, formatSigned } from "@/lib/format";
 import { stockOnHand } from "@/lib/inventory";
 import { shownCount } from "@/lib/list-size";
@@ -92,13 +93,26 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
     permissions.has("stock.issue")
       ? prisma.superDealer.findMany({
           where: { organizationId, deactivatedAt: null },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true, region: true },
+          select: {
+            id: true,
+            shopName: true,
+            contactName: true,
+            region: { select: { name: true } },
+            district: { select: { name: true } },
+          },
         })
       : [],
     stockOnHand(organizationId),
     prisma.stockMovement.count({ where: { organizationId } }),
   ]);
+  // The dealer picker shows "Shop · District, Region".
+  const stockDealers = dealers.sort(byDealerName).map((dealer) => ({
+    id: dealer.id,
+    name: dealerName(dealer),
+    region: dealer.region
+      ? [dealer.district?.name, dealer.region.name].filter(Boolean).join(", ")
+      : null,
+  }));
   const stockProducts = products.map((product) => ({
     ...product,
     onHand: onHand.get(product.id) ?? 0,
@@ -110,7 +124,7 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
         <div className="flex flex-wrap gap-2">
           {permissions.has("stock.receive") ? <ReceiveStockDialog products={stockProducts} /> : null}
           {permissions.has("stock.issue") ? (
-            <IssueStockDialog products={stockProducts} dealers={dealers} />
+            <IssueStockDialog products={stockProducts} dealers={stockDealers} />
           ) : null}
           {permissions.has("stock.adjust") ? <AdjustStockDialog products={stockProducts} /> : null}
         </div>
@@ -232,7 +246,7 @@ async function Movements({
       note: true,
       occurredOn: true,
       product: { select: { name: true } },
-      superDealer: { select: { name: true } },
+      superDealer: { select: { shopName: true, contactName: true } },
       createdBy: { select: { name: true, email: true } },
       reversedBy: { select: { id: true } },
     },
@@ -259,7 +273,7 @@ async function Movements({
           <TableBody>
             {movements.map((movement) => {
               const counterpart =
-                movement.superDealer?.name ?? movement.supplier ?? (movement.type === "adjustment" ? "Stock count" : "—");
+                (movement.superDealer && dealerName(movement.superDealer)) ?? movement.supplier ?? (movement.type === "adjustment" ? "Stock count" : "—");
               const details = [movement.reference, movement.note].filter(Boolean).join(" · ");
               const summary = `the ${TYPE_NOUNS[movement.type]} of ${formatCount(Math.abs(movement.quantity))} ${movement.product.name}`;
               return (
