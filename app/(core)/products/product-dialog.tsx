@@ -25,18 +25,16 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { InputGroup } from "@/components/ui/input-group";
-import { Textarea } from "@/components/ui/textarea";
 import { useFormAction } from "@/hooks/use-form-action";
 import type { ActionResult } from "@/lib/inventory";
+import { productCode } from "@/lib/product-code";
 
 export type EditableProduct = {
   id: string;
-  sku: string;
+  code: string;
   name: string;
-  unit: string;
-  price: number;
-  reorderLevel: number | null;
-  description: string | null;
+  size: string | null;
+  sellingPrice: number;
 };
 
 const initialState: ActionResult = { message: "" };
@@ -94,6 +92,7 @@ function ProductForm({
   product?: EditableProduct;
   onSaved: () => void;
 }) {
+  const [name, setName] = useState(product?.name ?? "");
   const [state, onSubmit, pending] = useFormAction(
     async (previous: ActionResult, formData: FormData) => {
       const result = await saveProduct(previous, formData);
@@ -116,82 +115,50 @@ function ProductForm({
       </DialogHeader>
       {product ? <input type="hidden" name="id" value={product.id} /> : null}
       <FieldGroup className="py-4">
-        <div className="grid gap-5 sm:grid-cols-[10rem_1fr]">
+        <Field>
+          <FieldLabel htmlFor="product-name">Name</FieldLabel>
+          <Input
+            id="product-name"
+            name="name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Sunflower oil"
+            autoComplete="off"
+            maxLength={200}
+            required
+          />
+          <FieldDescription>
+            Code:{" "}
+            <span className="font-mono text-foreground">
+              {product ? product.code : productCode(name) || "—"}
+            </span>
+            {product ? " (stays the same if you rename it)" : " (made from the name)"}
+          </FieldDescription>
+        </Field>
+        <div className="grid gap-5 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="product-sku">SKU</FieldLabel>
+            <FieldLabel htmlFor="product-size">Size</FieldLabel>
             <Input
-              id="product-sku"
-              name="sku"
-              defaultValue={product?.sku}
-              placeholder="TS-001"
-              autoComplete="off"
-              maxLength={40}
-              required
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="product-name">Name</FieldLabel>
-            <Input
-              id="product-name"
-              name="name"
-              defaultValue={product?.name}
-              placeholder="Sunflower oil 1L"
-              autoComplete="off"
-              maxLength={200}
-              required
-            />
-          </Field>
-        </div>
-        <div className="grid gap-5 sm:grid-cols-3">
-          <Field>
-            <FieldLabel htmlFor="product-unit">Unit</FieldLabel>
-            <Input
-              id="product-unit"
-              name="unit"
-              defaultValue={product?.unit ?? "piece"}
-              placeholder="piece"
+              id="product-size"
+              name="size"
+              defaultValue={product?.size ?? ""}
+              placeholder="1L"
               autoComplete="off"
               maxLength={30}
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="product-price">Price per unit</FieldLabel>
+            <FieldLabel htmlFor="product-price">Selling price</FieldLabel>
             <InputGroup>
               <MoneyInput
                 id="product-price"
-                name="price"
-                defaultValue={product ? String(product.price) : ""}
+                name="sellingPrice"
+                defaultValue={product ? String(product.sellingPrice) : ""}
                 placeholder="0"
               />
             </InputGroup>
           </Field>
-          <Field>
-            <FieldLabel htmlFor="product-reorder">Reorder level</FieldLabel>
-            <Input
-              id="product-reorder"
-              name="reorderLevel"
-              type="number"
-              min={0}
-              step={1}
-              inputMode="numeric"
-              defaultValue={product?.reorderLevel ?? ""}
-              placeholder="Off"
-            />
-          </Field>
         </div>
-        <FieldDescription className="-mt-3">
-          Stock at or below the reorder level is flagged as low.
-        </FieldDescription>
-        <Field>
-          <FieldLabel htmlFor="product-description">Description</FieldLabel>
-          <Textarea
-            id="product-description"
-            name="description"
-            defaultValue={product?.description ?? ""}
-            maxLength={1000}
-            rows={2}
-          />
-        </Field>
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
