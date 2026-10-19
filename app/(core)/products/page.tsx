@@ -7,7 +7,6 @@ import { AddProductDialog } from "./product-dialog";
 import { ProductMenu } from "./product-menu";
 import { NoAccessState } from "@/components/no-access-state";
 import { UrlTabs } from "@/components/url-tabs";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Empty,
@@ -42,7 +41,7 @@ export default function ProductsPage({ searchParams }: PageProps<"/products">) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
         <p className="text-muted-foreground">
-          What you stock, its unit and price, and how much is on hand.
+          What you stock, its size and selling price, and how much is on hand.
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
@@ -69,12 +68,10 @@ async function Products({ searchParams }: Pick<PageProps<"/products">, "searchPa
       orderBy: { name: "asc" },
       select: {
         id: true,
-        sku: true,
+        code: true,
         name: true,
-        unit: true,
-        price: true,
-        reorderLevel: true,
-        description: true,
+        size: true,
+        sellingPrice: true,
       },
     }),
     prisma.product.count({ where: { organizationId, archivedAt: null } }),
@@ -99,8 +96,8 @@ async function Products({ searchParams }: Pick<PageProps<"/products">, "searchPa
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
-                    <TableHead className="hidden sm:table-cell">Unit</TableHead>
-                    <TableHead className="text-right">Price</TableHead>
+                    <TableHead className="hidden sm:table-cell">Size</TableHead>
+                    <TableHead className="text-right">Selling price</TableHead>
                     <TableHead className="text-right">On hand</TableHead>
                     {canManage ? (
                       <TableHead className="w-10">
@@ -112,25 +109,19 @@ async function Products({ searchParams }: Pick<PageProps<"/products">, "searchPa
                 <TableBody>
                   {products.map((product) => {
                     const quantity = onHand.get(product.id) ?? 0;
-                    const low = product.reorderLevel !== null && quantity <= product.reorderLevel;
                     return (
                       <TableRow key={product.id}>
                         <TableCell>
                           <div className="font-medium">{product.name}</div>
-                          <div className="text-xs text-muted-foreground">{product.sku}</div>
+                          <div className="text-xs text-muted-foreground">{product.code}</div>
                         </TableCell>
                         <TableCell className="hidden text-muted-foreground sm:table-cell">
-                          {product.unit}
+                          {product.size ?? "—"}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {formatCount(product.price)}
+                          {formatCount(product.sellingPrice)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {low && tab === "active" ? (
-                            <Badge variant="destructive" className="mr-2">
-                              Low
-                            </Badge>
-                          ) : null}
                           {formatCount(quantity)}
                         </TableCell>
                         {canManage ? (
