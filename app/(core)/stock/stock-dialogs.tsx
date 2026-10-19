@@ -35,7 +35,7 @@ import { formatCount } from "@/lib/format";
 import { useFormAction } from "@/hooks/use-form-action";
 import type { ActionResult } from "@/lib/inventory";
 
-export type StockProduct = { id: string; name: string; sku: string; unit: string; onHand: number };
+export type StockProduct = { id: string; name: string; code: string; onHand: number };
 export type StockDealer = { id: string; name: string; region: string | null };
 
 type Action = (previous: ActionResult, formData: FormData) => Promise<ActionResult>;
@@ -133,7 +133,7 @@ function ProductLines({
               </NativeSelectOption>
               {products.map((product) => (
                 <NativeSelectOption key={product.id} value={product.id}>
-                  {product.name} ({product.sku})
+                  {product.name} ({product.code})
                   {showOnHand ? ` · ${formatCount(product.onHand)} on hand` : ""}
                 </NativeSelectOption>
               ))}
@@ -364,7 +364,7 @@ function AdjustForm({ products, onDone }: { products: StockProduct[]; onDone: ()
             </NativeSelectOption>
             {products.map((other) => (
               <NativeSelectOption key={other.id} value={other.id}>
-                {other.name} ({other.sku})
+                {other.name} ({other.code})
               </NativeSelectOption>
             ))}
           </NativeSelect>
