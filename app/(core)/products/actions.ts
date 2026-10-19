@@ -11,10 +11,13 @@ import {
   type ActionResult,
 } from "@/lib/inventory";
 import { getPrisma } from "@/lib/prisma";
+import { productCode, uniqueProductCode } from "@/lib/product-code";
 
-const SKU = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
-
-/** Adds a product, or edits one when the form carries its id. */
+/**
+ * Adds a product, or edits one when the form carries its id. The code is
+ * generated from the name when the product is added and never changes after,
+ * so it stays the same on paperwork when the product is renamed.
+ */
 export async function saveProduct(
   _previous: ActionResult,
   formData: FormData
@@ -23,37 +26,37 @@ export async function saveProduct(
   if (!member) return notAllowed;
 
   const id = readText(formData.get("id"));
-  const sku = readText(formData.get("sku"), 40);
   const name = readText(formData.get("name"));
-  const unit = readText(formData.get("unit"), 30) ?? "piece";
-  const description = readText(formData.get("description"), 1000);
-  const priceText = readText(formData.get("price"));
-  const price = priceText === null ? 0 : readWholeNumber(priceText);
-  const reorderText = readText(formData.get("reorderLevel"));
-  const reorderLevel = reorderText === null ? null : readWholeNumber(reorderText);
+  const size = readText(formData.get("size"), 30);
+  const priceText = readText(formData.get("sellingPrice"));
+  const sellingPrice = priceText === null ? 0 : readWholeNumber(priceText);
 
-  if (!sku || !SKU.test(sku)) {
-    return { message: "Enter a SKU: letters, digits, and . _ / - with no spaces." };
-  }
   if (!name) return { message: "Enter the product's name." };
-  if (price === null) return { message: "Enter the price as a whole number." };
-  if (reorderText !== null && reorderLevel === null) {
-    return { message: "Enter the reorder level as a whole number, or leave it empty." };
-  }
+  if (sellingPrice === null) return { message: "Enter the selling price as a whole number." };
 
-  const data = { sku, name, unit, description, price, reorderLevel };
   const prisma = getPrisma();
   const organizationId = member.organization.id;
-  try {
-    if (id) {
-      const { count } = await prisma.product.updateMany({ where: { id, organizationId }, data });
-      if (!count) return { message: "That product no longer exists." };
-    } else {
-      await prisma.product.create({ data: { ...data, organizationId } });
+  const userId = member.userId;
+  const data = { name, size, sellingPrice, updatedById: userId };
+
+  if (id) {
+    const { count } = await prisma.product.updateMany({ where: { id, organizationId }, data });
+    if (!count) return { message: "That product no longer exists." };
+  } else {
+    const base = productCode(name);
+    if (!base) return { message: "Give the product a name with letters or digits." };
+    const taken = await prisma.product.findMany({
+      where: { organizationId, code: { startsWith: base } },
+      select: { code: true },
+    });
+    const code = uniqueProductCode(base, new Set(taken.map((product) => product.code.toUpperCase())));
+    try {
+      await prisma.product.create({ data: { ...data, code, organizationId, createdById: userId } });
+    } catch (error) {
+      // Someone added a product with the same code a moment ago.
+      if (isUniqueViolation(error)) return { message: "That code was just taken. Try again." };
+      throw error;
     }
-  } catch (error) {
-    if (isUniqueViolation(error)) return { message: `Another product already uses SKU ${sku}.` };
-    throw error;
   }
 
   revalidatePath("/products");
@@ -68,7 +71,7 @@ export async function setProductArchived(id: string, archived: boolean): Promise
 
   const { count } = await getPrisma().product.updateMany({
     where: { id, organizationId: member.organization.id },
-    data: { archivedAt: archived ? new Date() : null },
+    data: { archivedAt: archived ? new Date() : null, updatedById: member.userId },
   });
   if (!count) return { message: "That product no longer exists." };
 
