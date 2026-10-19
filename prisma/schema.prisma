@@ -43,6 +43,8 @@ model User {
   sessions             Session[]
   verificationTokens   VerificationToken[]
   stockMovements       StockMovement[]
+  productsCreated      Product[]           @relation("ProductCreatedBy")
+  productsUpdated      Product[]           @relation("ProductUpdatedBy")
 
   @@map("users")
 }
@@ -259,29 +261,34 @@ model Invitation {
 // Inventory
 // ---------------------------------------------------------------------------
 
-// What the organization stocks. Quantities are whole numbers of `unit`;
-// prices are whole amounts in the organization's currency. Stock on hand is
-// not stored here: it is the sum of the product's stock movements.
+// What the organization stocks. Prices are whole amounts in the
+// organization's currency. Stock on hand is not stored here: it is the sum of
+// the product's stock movements.
 model Product {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
-  // Unique among the organization's products, ignoring case.
-  sku            String    @db.Citext
+  // Generated from the name when the product is added, e.g. "SUNFLOWER-OIL";
+  // unique among the organization's products, ignoring case.
+  code           String    @db.Citext
   name           String
+  // Kept for later; not shown or edited in the app yet.
   description    String?
-  unit           String    @default("piece")
-  price          Int       @default(0)
-  // Stock at or below this is shown as low; null turns the warning off.
-  reorderLevel   Int?      @map("reorder_level")
+  // Pack size as written on the product: "1L", "500g", "24 x 330ml".
+  size           String?
+  sellingPrice   Int       @default(0) @map("selling_price")
   // Archived products keep their history but can't be received or issued.
   archivedAt     DateTime? @map("archived_at") @db.Timestamptz
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdById    String?   @map("created_by_id") @db.Uuid
+  updatedById    String?   @map("updated_by_id") @db.Uuid
 
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?           @relation("ProductCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?           @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   stockMovements StockMovement[]
 
-  @@unique([organizationId, sku])
+  @@unique([organizationId, code])
   @@map("products")
 }
 
