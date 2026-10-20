@@ -142,18 +142,23 @@ export async function changeMemberRole(membershipId: string, roleId: string): Pr
   const member = await memberWith("members.update");
   if (!member) return notAllowed;
 
-  const role = await findRole(member, roleId);
+  const roles = await assignableRoles(member);
+  const role = roles.find((role) => role.id === roleId);
   if (!role) return { message: "Pick a role you're allowed to give." };
 
   const prisma = getPrisma();
   const result = await prisma.$transaction(async (tx): Promise<Result> => {
     const target = await tx.membership.findFirst({
       where: { id: membershipId, organizationId: member.organization.id },
-      select: { role: { select: { key: true } } },
+      select: { role: { select: { id: true, key: true } } },
     });
     if (!target) return { message: "That member is no longer here." };
     if (target.role.key === "owner" && member.role.key !== "owner") {
       return { message: "Only an owner can change an owner's role." };
+    }
+    // Their role can do things you can't, so you couldn't give it back.
+    if (!roles.some((role) => role.id === target.role.id)) {
+      return { message: "Only someone with every permission of their role can change it." };
     }
     if (
       target.role.key === "owner" &&
