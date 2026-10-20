@@ -67,18 +67,27 @@ export async function listOrganizations(userId: string) {
 
 /**
  * Roles a member may be given in this organization: the system roles plus
- * its own. Only owners can hand out the owner role.
+ * its own. Only owners can hand out the owner role, and nobody can hand out
+ * a role that can do something they can't, so a custom role is no way round.
  */
 export async function assignableRoles(member: ActiveMember) {
   const roles = await getPrisma().role.findMany({
     where: { OR: [{ organizationId: null }, { organizationId: member.organization.id }] },
     orderBy: { createdAt: "asc" },
-    select: { id: true, key: true, name: true, organizationId: true },
+    select: {
+      id: true,
+      key: true,
+      name: true,
+      organizationId: true,
+      permissions: { select: { permissionKey: true } },
+    },
   })
   // System roles were seeded together, so order them by rank, not by date.
   const rank = (key: string, custom: boolean) =>
     custom ? SYSTEM_ROLES.length : SYSTEM_ROLES.indexOf(key as SystemRole)
   return roles
     .filter((role) => role.key !== "owner" || member.role.key === "owner")
+    .filter((role) => role.permissions.every((grant) => member.permissions.has(grant.permissionKey)))
     .sort((a, b) => rank(a.key, !!a.organizationId) - rank(b.key, !!b.organizationId))
+    .map(({ id, key, name, organizationId }) => ({ id, key, name, organizationId }))
 }
