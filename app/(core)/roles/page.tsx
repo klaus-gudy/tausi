@@ -108,11 +108,25 @@ async function Roles() {
                 </CardHeader>
                 <CardContent className="mt-auto flex flex-wrap gap-1">
                   {touched.length ? (
-                    touched.map((group) => (
-                      <Badge key={group.key} variant="outline" className="h-5 px-1.5 text-[11px]">
-                        {group.label}
-                      </Badge>
-                    ))
+                    touched.map((group) => {
+                      // Filled when the role has the whole module, dashed when only part.
+                      const full = group.permissions.every((p) => keys.has(p.key));
+                      return (
+                        <Badge
+                          key={group.key}
+                          variant="outline"
+                          title={full ? "Full access" : "Some access"}
+                          className={
+                            full
+                              ? "h-5 border-primary/30 bg-primary/10 px-1.5 text-[11px] text-primary"
+                              : "h-5 border-dashed px-1.5 text-[11px] text-muted-foreground"
+                          }
+                        >
+                          {group.label}
+                          <span className="sr-only">{full ? ", full access" : ", some access"}</span>
+                        </Badge>
+                      );
+                    })
                   ) : (
                     <span className="text-xs text-muted-foreground">No permissions yet</span>
                   )}
