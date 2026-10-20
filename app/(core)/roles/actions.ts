@@ -9,15 +9,17 @@ import { withReadKeys } from "@/lib/permissions";
 import { placeKey } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 
-// Only the organization's own roles are edited here. The system roles are
-// shared by every organization, so they can be copied but not changed.
+// Only the organization's own roles are edited here. Owner, the one system
+// role, is shared by every organization and can always do everything.
+
+export type SaveRoleResult = ActionResult & { id?: string };
 
 /**
  * Adds a custom role, or edits one when the form carries its id. You can
  * only grant or take away permissions you have yourself: any the role has
  * that you don't are kept as they are.
  */
-export async function saveRole(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function saveRole(_previous: SaveRoleResult, formData: FormData): Promise<SaveRoleResult> {
   const member = await memberWith("roles.manage");
   if (!member) return notAllowed;
 
@@ -56,6 +58,7 @@ export async function saveRole(_previous: ActionResult, formData: FormData): Pro
   ];
   if (!keys.length) return { message: "Pick at least one permission." };
 
+  let savedId = id;
   try {
     if (id) {
       await prisma.$transaction([
@@ -70,7 +73,8 @@ export async function saveRole(_previous: ActionResult, formData: FormData): Pro
       const base = placeKey(name) || "role";
       let key = base;
       for (let n = 2; taken.has(key); n++) key = `${base}-${n}`;
-      await prisma.role.create({
+      const created = await prisma.role.create({
+        select: { id: true },
         data: {
           organizationId,
           key,
@@ -79,6 +83,7 @@ export async function saveRole(_previous: ActionResult, formData: FormData): Pro
           permissions: { create: keys.map((permissionKey) => ({ permissionKey })) },
         },
       });
+      savedId = created.id;
     }
   } catch (error) {
     if (isUniqueViolation(error)) return { message: "That role was just added. Try again in a moment." };
@@ -87,7 +92,7 @@ export async function saveRole(_previous: ActionResult, formData: FormData): Pro
 
   // Members with this role see the change on their next page.
   revalidatePath("/", "layout");
-  return { success: true, message: id ? `${name} saved.` : `${name} added.` };
+  return { success: true, message: id ? `${name} saved.` : `${name} added.`, id: savedId ?? undefined };
 }
 
 /**
