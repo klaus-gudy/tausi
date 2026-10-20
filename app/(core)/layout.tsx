@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppSidebar, SidebarNavSkeleton } from "@/components/app-sidebar";
+import { NavMain } from "@/components/nav-main";
 import { NavUser, NavUserSkeleton } from "@/components/nav-user";
 import { OrgSwitcher, OrgSwitcherSkeleton } from "@/components/org-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -17,6 +18,11 @@ export default function CoreLayout({ children }: LayoutProps<"/">) {
         header={
           <Suspense fallback={<OrgSwitcherSkeleton />}>
             <OrgSwitcher />
+          </Suspense>
+        }
+        nav={
+          <Suspense fallback={<SidebarNavSkeleton />}>
+            <NavMain />
           </Suspense>
         }
         footer={
