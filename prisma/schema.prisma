@@ -161,8 +161,10 @@ model Permission {
   @@map("permissions")
 }
 
-// System roles (owner, admin, member, viewer) have no organization and are
-// shared by all; an organization can add custom roles of its own.
+// The one system role, owner, has no organization and is shared by all: it
+// can do everything and goes to whoever creates the organization. Every other
+// role is the organization's own. A migration adding permission keys grants
+// them to owner.
 model Role {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String?  @map("organization_id") @db.Uuid
