@@ -11,6 +11,7 @@ import {
   MapPinned,
   Package,
   PackagePlus,
+  ShieldCheck,
   Store,
   Truck,
   UserCheck,
@@ -65,7 +66,10 @@ const navGroups = [
   },
   {
     label: "Settings",
-    items: [{ title: "Members & roles", href: "/members", icon: Users }],
+    items: [
+      { title: "Members", href: "/members", icon: Users },
+      { title: "Roles & permissions", href: "/roles", icon: ShieldCheck },
+    ],
   },
 ]
 
