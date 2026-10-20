@@ -7,7 +7,6 @@ import { readPermissionChoices, readRole } from "../data";
 import { RoleForm } from "../role-form";
 import { NoAccessState } from "@/components/no-access-state";
 import { NotFoundState } from "@/components/not-found-state";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isUuid } from "@/lib/inventory";
 import { readActiveMember } from "@/lib/membership";
@@ -45,23 +44,17 @@ async function Role({ params }: Pick<PageProps<"/roles/[id]">, "params">) {
   ]);
 
   return (
-    <>
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          {role.name}
-          {owner ? <Badge variant="secondary">Built-in</Badge> : null}
-        </h1>
-        <p className="text-muted-foreground">
-          {owner
-            ? "Whoever creates the organization is its owner. Owners can do everything, so this role can't be changed."
-            : `${members === 1 ? "1 member has" : `${members} members have`} this role.`}
-        </p>
-      </div>
-      <RoleForm
-        role={role}
-        choices={choices}
-        readOnly={owner || !member.permissions.has("roles.manage")}
-      />
-    </>
+    <RoleForm
+      role={role}
+      members={members}
+      choices={choices}
+      builtIn={owner}
+      readOnly={owner || !member.permissions.has("roles.manage")}
+      note={
+        owner
+          ? "Whoever creates the organization is its owner. Owners can do everything, so this role can't be changed."
+          : undefined
+      }
+    />
   );
 }
