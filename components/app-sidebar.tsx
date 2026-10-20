@@ -1,6 +1,5 @@
 "use client"
 
-import { Suspense } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -18,6 +17,7 @@ import {
   UserCheck,
   Users,
   Warehouse,
+  type LucideIcon,
 } from "lucide-react"
 
 import {
@@ -33,8 +33,15 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { Skeleton } from "@/components/ui/skeleton"
 
-const navGroups = [
+// Each item names the permission its page needs, so members only see what
+// their role opens. Pages still check it themselves; hiding is a courtesy.
+// The pages that are still to come use their module's read permission.
+const navGroups: {
+  label: string
+  items: { title: string; href: string; icon: LucideIcon; permission?: string }[]
+}[] = [
   {
     label: "Overview",
     items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
@@ -42,90 +49,110 @@ const navGroups = [
   {
     label: "Inventory",
     items: [
-      { title: "Stock on hand", href: "/stock-on-hand", icon: Boxes },
-      { title: "Goods received", href: "/goods-received", icon: PackagePlus },
-      { title: "Transfers", href: "/transfers", icon: ArrowLeftRight },
-      { title: "Stock counts", href: "/stock-counts", icon: ClipboardCheck },
-      { title: "Movement history", href: "/movement-history", icon: History },
+      { title: "Stock on hand", href: "/stock-on-hand", icon: Boxes, permission: "products.read" },
+      { title: "Goods received", href: "/goods-received", icon: PackagePlus, permission: "stock.read" },
+      { title: "Transfers", href: "/transfers", icon: ArrowLeftRight, permission: "stock.read" },
+      { title: "Stock counts", href: "/stock-counts", icon: ClipboardCheck, permission: "stock.read" },
+      { title: "Movement history", href: "/movement-history", icon: History, permission: "stock.read" },
     ],
   },
   {
     label: "Field sales",
     items: [
-      { title: "Deliveries", href: "/deliveries", icon: Truck },
-      { title: "Salespeople", href: "/salespeople", icon: UserCheck },
+      { title: "Deliveries", href: "/deliveries", icon: Truck, permission: "stock.read" },
+      { title: "Salespeople", href: "/salespeople", icon: UserCheck, permission: "members.read" },
     ],
   },
   {
     label: "Catalogue",
     items: [
-      { title: "Products", href: "/products", icon: Package },
-      { title: "Super dealers", href: "/super-dealers", icon: Store },
-      { title: "Zones", href: "/zones", icon: MapPinned },
-      { title: "Warehouses", href: "/warehouses", icon: Warehouse },
+      { title: "Products", href: "/products", icon: Package, permission: "products.read" },
+      { title: "Super dealers", href: "/super-dealers", icon: Store, permission: "dealers.read" },
+      { title: "Zones", href: "/zones", icon: MapPinned, permission: "dealers.read" },
+      { title: "Warehouses", href: "/warehouses", icon: Warehouse, permission: "warehouses.read" },
     ],
   },
   {
     label: "Settings",
     items: [
-      { title: "Members", href: "/members", icon: Users },
-      { title: "Roles & permissions", href: "/roles", icon: ShieldCheck },
+      { title: "Members", href: "/members", icon: Users, permission: "members.read" },
+      { title: "Roles & permissions", href: "/roles", icon: ShieldCheck, permission: "members.read" },
     ],
   },
 ]
 
 export function AppSidebar({
   header,
+  nav,
   footer,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   /** Server-rendered organization switcher; see OrgSwitcher. */
   header?: React.ReactNode
+  /** Server-rendered links the member may open; see NavMain. */
+  nav?: React.ReactNode
   /** Server-rendered user menu; see NavUser. */
   footer?: React.ReactNode
 }) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>{header}</SidebarHeader>
-      <SidebarContent>
-        {/* The current path is only known at request time, so dynamic routes
-            stream it in; until then the links show with nothing active. */}
-        <Suspense fallback={<NavGroups pathname="" />}>
-          <CurrentNavGroups />
-        </Suspense>
-      </SidebarContent>
+      <SidebarContent>{nav}</SidebarContent>
       <SidebarFooter>{footer}</SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )
 }
 
-function CurrentNavGroups() {
-  return <NavGroups pathname={usePathname()} />
+/** The nav groups, without the items `permissions` doesn't open. */
+export function SidebarNav({ permissions }: { permissions: string[] }) {
+  const pathname = usePathname()
+  const held = new Set(permissions)
+  return navGroups.map((group) => {
+    const items = group.items.filter((item) => !item.permission || held.has(item.permission))
+    if (!items.length) return null
+    return (
+      <SidebarGroup key={group.label}>
+        <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {items.map((item) => (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith(item.href)}
+                  tooltip={item.title}
+                >
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    )
+  })
 }
 
-function NavGroups({ pathname }: { pathname: string }) {
-  return navGroups.map((group) => (
-    <SidebarGroup key={group.label}>
-      <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {group.items.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname.startsWith(item.href)}
-                tooltip={item.title}
-              >
-                <Link href={item.href}>
-                  <item.icon />
-                  <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      </SidebarGroupContent>
+// Fixed widths, not SidebarMenuSkeleton: its random width can't be in a
+// prerendered fallback.
+const SKELETON_WIDTHS = ["w-2/3", "w-1/2", "w-3/4", "w-3/5", "w-1/2", "w-2/3"]
+
+/** Stands in for the nav while the member's permissions load. */
+export function SidebarNavSkeleton() {
+  return (
+    <SidebarGroup>
+      <SidebarMenu>
+        {SKELETON_WIDTHS.map((width, index) => (
+          <SidebarMenuItem key={index} className="flex h-8 items-center gap-2 px-2">
+            <Skeleton className="size-4 shrink-0 rounded-md" />
+            <Skeleton className={`h-4 ${width} group-data-[collapsible=icon]:hidden`} />
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
     </SidebarGroup>
-  ))
+  )
 }
