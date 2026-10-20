@@ -140,7 +140,8 @@ async function Members() {
                 const self = row.id === member.membershipId;
                 const name = row.user.name || row.user.email;
                 const touchesOwner = row.role.key === "owner" && !isOwner;
-                const editable = canUpdate && !touchesOwner;
+                // Only a role you could give them yourself can be changed.
+                const editable = canUpdate && roles.some((role) => role.id === row.role.id);
                 const removable = self || (canRemove && !touchesOwner);
                 return (
                   <TableRow key={row.id}>
