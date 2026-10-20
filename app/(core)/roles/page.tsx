@@ -1,25 +1,25 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { connection } from "next/server";
-import { Fragment, Suspense } from "react";
-import { Check, Minus } from "lucide-react";
+import { Suspense } from "react";
+import { Plus, ShieldCheck } from "lucide-react";
 
-import { AddRoleDialog, type PermissionChoices } from "./role-dialog";
-import { RoleMenu } from "./role-menu";
+import { readPermissionChoices } from "./data";
 import { NoAccessState } from "@/components/no-access-state";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatCount } from "@/lib/format";
-import { readActiveMember, SYSTEM_ROLES, type SystemRole } from "@/lib/membership";
-import { groupPermissions } from "@/lib/permissions";
+import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -32,7 +32,7 @@ export default function RolesPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Roles & permissions</h1>
         <p className="text-muted-foreground">
-          What each role can do, part by part of the app. Give members a role on the Members page.
+          Open a role to see and set what it can do. Give members a role on the Members page.
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
@@ -52,157 +52,108 @@ async function Roles() {
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [roles, counts, permissions] = await Promise.all([
+  const [roles, counts, { modules }] = await Promise.all([
     prisma.role.findMany({
-      where: { OR: [{ organizationId: null }, { organizationId }] },
-      orderBy: { createdAt: "asc" },
+      where: { OR: [{ organizationId: null, key: "owner" }, { organizationId }] },
+      orderBy: { name: "asc" },
       select: {
         id: true,
-        key: true,
         name: true,
         description: true,
         organizationId: true,
         permissions: { select: { permissionKey: true } },
       },
     }),
-    // System roles are shared, so count only this organization's members.
+    // Owner is shared, so count only this organization's members.
     prisma.membership.groupBy({ by: ["roleId"], where: { organizationId }, _count: true }),
-    prisma.permission.findMany({ select: { key: true, description: true } }),
+    readPermissionChoices(member),
   ]);
 
-  const modules = groupPermissions(permissions);
   const memberCounts = new Map(counts.map((row) => [row.roleId, row._count]));
-  // System roles first, by rank, then the organization's own by age.
-  const rank = (role: (typeof roles)[number]) =>
-    role.organizationId ? SYSTEM_ROLES.length : SYSTEM_ROLES.indexOf(role.key as SystemRole);
-  const ordered = roles
-    .map((role) => ({ ...role, keys: new Set(role.permissions.map((grant) => grant.permissionKey)) }))
-    .sort((a, b) => rank(a) - rank(b));
-  const choices: PermissionChoices = { modules, grantable: [...member.permissions] };
+  const total = modules.reduce((sum, group) => sum + group.permissions.length, 0);
+  // Owner first, then the organization's own by name.
+  const ordered = [...roles].sort((a, b) => Number(!!a.organizationId) - Number(!!b.organizationId));
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div className="grid gap-1.5">
-            <CardTitle>Roles</CardTitle>
-            <CardDescription>
-              Built-in roles are the same in every organization. For something in between, add a
-              role of your own or duplicate a built-in one.
-            </CardDescription>
-          </div>
-          {canManage ? <AddRoleDialog choices={choices} /> : null}
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Role</TableHead>
-                <TableHead className="text-right">Members</TableHead>
-                <TableHead className="hidden text-right sm:table-cell">Permissions</TableHead>
-                {canManage ? (
-                  <TableHead className="w-10">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                ) : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ordered.map((role) => {
-                const system = !role.organizationId;
-                return (
-                  <TableRow key={role.id}>
-                    <TableCell className="whitespace-normal">
-                      <div className="flex items-center gap-2 font-medium">
-                        {role.name}
-                        {system ? <Badge variant="secondary">Built-in</Badge> : null}
-                        {role.id === member.role.id ? (
-                          <span className="font-normal text-muted-foreground">(yours)</span>
-                        ) : null}
-                      </div>
-                      {role.description ? (
-                        <div className="text-xs text-muted-foreground">{role.description}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCount(memberCounts.get(role.id) ?? 0)}
-                    </TableCell>
-                    <TableCell className="hidden text-right tabular-nums text-muted-foreground sm:table-cell">
-                      {formatCount(role.keys.size)} of {formatCount(permissions.length)}
-                    </TableCell>
-                    {canManage ? (
-                      <TableCell>
-                        {/* The owner role is everything; there's nothing to copy from it. */}
-                        {role.key === "owner" && system ? null : (
-                          <RoleMenu
-                            role={{
-                              id: role.id,
-                              name: role.name,
-                              description: role.description,
-                              permissions: [...role.keys],
-                            }}
-                            system={system}
-                            choices={choices}
-                          />
-                        )}
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Permissions by module</CardTitle>
-          <CardDescription>
-            Viewing a module comes with anything else in it: a role that can add products can
-            also see them.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-56">Permission</TableHead>
-                {ordered.map((role) => (
-                  <TableHead key={role.id} className="text-center">
+      {canManage ? (
+        <div className="flex justify-end">
+          <Button asChild>
+            <Link href="/roles/new">
+              <Plus data-icon="inline-start" />
+              New role
+            </Link>
+          </Button>
+        </div>
+      ) : null}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {ordered.map((role) => {
+          const keys = new Set(role.permissions.map((grant) => grant.permissionKey));
+          const touched = modules.filter((group) => group.permissions.some((p) => keys.has(p.key)));
+          const members = memberCounts.get(role.id) ?? 0;
+          return (
+            <Link
+              key={role.id}
+              href={`/roles/${role.id}`}
+              className="rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Card className="h-full transition-colors hover:bg-muted/40">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
                     {role.name}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {modules.map((group) => (
-                <Fragment key={group.key}>
-                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableCell colSpan={ordered.length + 1} className="font-medium">
-                      {group.label}
-                    </TableCell>
-                  </TableRow>
-                  {group.permissions.map((permission) => (
-                    <TableRow key={permission.key}>
-                      <TableCell className="whitespace-normal pl-4">{permission.label}</TableCell>
-                      {ordered.map((role) => (
-                        <TableCell key={role.id} className="text-center">
-                          {role.keys.has(permission.key) ? (
-                            <Check className="mx-auto size-4 text-primary" aria-label="Yes" />
-                          ) : (
-                            <Minus className="mx-auto size-4 text-muted-foreground/40" aria-label="No" />
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </Fragment>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    {role.organizationId ? null : <Badge variant="secondary">Built-in</Badge>}
+                    {role.id === member.role.id ? (
+                      <span className="text-sm font-normal text-muted-foreground">(yours)</span>
+                    ) : null}
+                  </CardTitle>
+                  <CardDescription>
+                    {role.description ?? (role.organizationId ? "No description" : "Can do everything")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-1.5">
+                  {touched.length ? (
+                    touched.map((group) => (
+                      <Badge key={group.key} variant="outline">
+                        {group.label}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No permissions yet</span>
+                  )}
+                </CardContent>
+                <CardFooter className="mt-auto text-sm text-muted-foreground tabular-nums">
+                  {members === 1 ? "1 member" : `${formatCount(members)} members`} ·{" "}
+                  {formatCount(keys.size)} of {formatCount(total)} permissions
+                </CardFooter>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+      {ordered.length === 1 ? (
+        <Empty className="flex-none border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ShieldCheck />
+            </EmptyMedia>
+            <EmptyTitle>Only the owner role so far</EmptyTitle>
+            <EmptyDescription>
+              Add roles for the people you work with, like a storekeeper or a sales rep, and pick
+              what each can do.
+            </EmptyDescription>
+          </EmptyHeader>
+          {canManage ? (
+            <EmptyContent>
+              <Button asChild>
+                <Link href="/roles/new">
+                  <Plus data-icon="inline-start" />
+                  New role
+                </Link>
+              </Button>
+            </EmptyContent>
+          ) : null}
+        </Empty>
+      ) : null}
     </>
   );
 }
