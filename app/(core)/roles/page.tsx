@@ -7,7 +7,7 @@ import { Plus, ShieldCheck } from "lucide-react";
 import { readPermissionChoices } from "./data";
 import { NoAccessState } from "@/components/no-access-state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Empty,
   EmptyContent,
@@ -17,6 +17,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCount } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
 import type { PermissionModule } from "@/lib/permissions";
 import { getPrisma } from "@/lib/prisma";
@@ -50,8 +51,9 @@ async function Roles() {
   const canManage = member.permissions.has("roles.manage");
   const organizationId = member.organization.id;
 
-  const [roles, { modules }] = await Promise.all([
-    getPrisma().role.findMany({
+  const prisma = getPrisma();
+  const [roles, counts, { modules }] = await Promise.all([
+    prisma.role.findMany({
       where: { OR: [{ organizationId: null, key: "owner" }, { organizationId }] },
       orderBy: { name: "asc" },
       select: {
@@ -62,8 +64,12 @@ async function Roles() {
         permissions: { select: { permissionKey: true } },
       },
     }),
+    // Owner is shared, so count only this organization's members.
+    prisma.membership.groupBy({ by: ["roleId"], where: { organizationId }, _count: true }),
     readPermissionChoices(member),
   ]);
+
+  const memberCounts = new Map(counts.map((row) => [row.roleId, row._count]));
 
   // Owner first, then the organization's own by name.
   const ordered = [...roles].sort((a, b) => Number(!!a.organizationId) - Number(!!b.organizationId));
@@ -83,6 +89,7 @@ async function Roles() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {ordered.map((role) => {
           const keys = new Set(role.permissions.map((grant) => grant.permissionKey));
+          const members = memberCounts.get(role.id) ?? 0;
           const description = role.description ?? (role.organizationId ? "No description" : "Can do everything");
           return (
             <Link
@@ -100,6 +107,9 @@ async function Roles() {
                 <CardContent className="mt-auto">
                   <ModuleDots modules={modules} keys={keys} />
                 </CardContent>
+                <CardFooter className="text-sm text-muted-foreground tabular-nums">
+                  {members === 1 ? "1 member" : `${formatCount(members)} members`}
+                </CardFooter>
               </Card>
             </Link>
           );
