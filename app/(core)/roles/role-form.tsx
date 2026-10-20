@@ -1,23 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { deleteRole, saveRole, type SaveRoleResult } from "./actions";
+import { DuplicateRoleDialog } from "./duplicate-role-dialog";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { useFormAction } from "@/hooks/use-form-action";
 import type { PermissionModule } from "@/lib/permissions";
 
 export type EditableRole = {
-  /** Empty for a role that isn't saved yet. */
   id: string;
   name: string;
   description: string | null;
@@ -33,30 +32,56 @@ export type PermissionChoices = {
 
 const initialState: SaveRoleResult = { message: "" };
 
+type Draft = { name: string; description: string; permissions: Set<string> };
+
+function draftOf(role: EditableRole): Draft {
+  return { name: role.name, description: role.description ?? "", permissions: new Set(role.permissions) };
+}
+
+function sameDraft(a: Draft, b: Draft) {
+  return (
+    a.name.trim() === b.name.trim() &&
+    a.description.trim() === b.description.trim() &&
+    a.permissions.size === b.permissions.size &&
+    [...a.permissions].every((key) => b.permissions.has(key))
+  );
+}
+
 /**
- * A role's name and its permissions, module by module. The same page shows a
- * role and sets it: read-only for the owner role and for members who can't
- * manage roles.
+ * A role's own page: its name and description at the top, then what it can
+ * do, module by module. The same page shows the role and sets it, with Save
+ * appearing once something changes. Read-only for the owner role and for
+ * members who can't manage roles.
  */
 export function RoleForm({
   role,
+  members,
   choices,
   readOnly = false,
+  builtIn = false,
+  note,
 }: {
-  role?: EditableRole;
+  role: EditableRole;
+  members: number;
   choices: PermissionChoices;
   readOnly?: boolean;
+  builtIn?: boolean;
+  /** Shown under the description, e.g. why the role can't be changed. */
+  note?: string;
 }) {
   const router = useRouter();
   const grantable = new Set(readOnly ? [] : choices.grantable);
-  const [checked, setChecked] = useState(() => new Set(role?.permissions ?? []));
+  // What was last saved, so the form knows when there's something to save.
+  const [saved, setSaved] = useState(() => draftOf(role));
+  const [draft, setDraft] = useState(() => draftOf(role));
   const [deleting, setDeleting] = useState(false);
+  const dirty = !sameDraft(draft, saved);
   const [state, onSubmit, pending] = useFormAction(
     async (previous: SaveRoleResult, formData: FormData) => {
       const result = await saveRole(previous, formData);
       if (result.success) {
         toast.success(result.message);
-        if (!role?.id && result.id) router.push(`/roles/${result.id}`);
+        setSaved(draft);
       }
       return result;
     },
@@ -65,8 +90,8 @@ export function RoleForm({
 
   /** Ticks or unticks keys, keeping each module's read key in step. */
   function toggle(group: PermissionModule, keys: string[], on: boolean) {
-    setChecked((current) => {
-      const next = new Set(current);
+    setDraft((current) => {
+      const next = new Set(current.permissions);
       for (const key of keys) {
         if (!grantable.has(key)) continue;
         if (on) next.add(key);
@@ -81,58 +106,89 @@ export function RoleForm({
           for (const p of group.permissions) if (grantable.has(p.key)) next.delete(p.key);
         }
       }
-      return next;
+      return { ...current, permissions: next };
     });
   }
 
-  const saved = !!role?.id;
+  // Inputs that read as a heading and its subtitle until they're clicked.
+  const inline =
+    "-mx-2 w-full rounded-md bg-transparent px-2 outline-none transition-colors read-only:cursor-default not-read-only:hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50";
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
-      {saved ? <input type="hidden" name="id" value={role.id} /> : null}
-      {[...checked].map((key) => (
+      <input type="hidden" name="id" value={role.id} />
+      {[...draft.permissions].map((key) => (
         <input key={key} type="hidden" name="permissions" value={key} />
       ))}
-      <Card>
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-          <CardDescription>What the role is called and who it&apos;s for.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="role-name">Name</FieldLabel>
-            <Input
-              id="role-name"
-              name="name"
-              defaultValue={role?.name ?? ""}
-              placeholder="Storekeeper"
-              autoComplete="off"
-              maxLength={60}
-              readOnly={readOnly}
-              required
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="role-description">
-              Description <span className="font-normal text-muted-foreground">(optional)</span>
-            </FieldLabel>
-            <Input
-              id="role-description"
+
+      <div className="sticky top-0 z-10 -mx-4 border-b bg-background/95 px-4 py-4 backdrop-blur">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="grid min-w-0 flex-1 gap-1">
+            <div className="flex items-center gap-2">
+              <input
+                name="name"
+                aria-label="Role name"
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                readOnly={readOnly}
+                required
+                maxLength={60}
+                autoComplete="off"
+                className={`${inline} h-10 min-w-0 text-2xl font-semibold tracking-tight`}
+              />
+              {builtIn ? <Badge variant="secondary">Built-in</Badge> : null}
+            </div>
+            <input
               name="description"
-              defaultValue={role?.description ?? ""}
-              placeholder={readOnly ? "" : "Receives and counts stock"}
-              autoComplete="off"
-              maxLength={200}
+              aria-label="Role description"
+              value={draft.description}
+              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
               readOnly={readOnly}
+              maxLength={200}
+              autoComplete="off"
+              placeholder={readOnly ? "" : "Add a description, e.g. Receives and counts stock"}
+              className={`${inline} h-8 text-muted-foreground placeholder:text-muted-foreground/60`}
             />
-          </Field>
-        </CardContent>
-      </Card>
+            <p className="text-xs text-muted-foreground">
+              {note ?? (members === 1 ? "1 member has this role." : `${members} members have this role.`)}
+            </p>
+          </div>
+          {readOnly ? null : (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {dirty ? (
+                <>
+                  <Button key="discard" type="button" variant="ghost" disabled={pending} onClick={() => setDraft(saved)}>
+                    Discard
+                  </Button>
+                  <Button key="save" type="submit" disabled={pending || !draft.name.trim()}>
+                    {pending ? "Saving…" : "Save changes"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <DuplicateRoleDialog key="duplicate" role={role} />
+                  <Button
+                    key="delete"
+                    type="button"
+                    variant="outline"
+                    className="text-destructive"
+                    onClick={() => setDeleting(true)}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                    Delete
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        {state.message && !state.success ? <FieldError className="mt-2">{state.message}</FieldError> : null}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {choices.modules.map((group) => {
           const keys = group.permissions.map((p) => p.key);
-          const all = keys.every((key) => checked.has(key));
+          const all = keys.every((key) => draft.permissions.has(key));
           const id = `role-module-${group.key}`;
           return (
             <Card key={group.key}>
@@ -161,7 +217,7 @@ export function RoleForm({
                     <Field key={permission.key} orientation="horizontal">
                       <Checkbox
                         id={permissionId}
-                        checked={checked.has(permission.key)}
+                        checked={draft.permissions.has(permission.key)}
                         disabled={!allowed}
                         onCheckedChange={(on) => toggle(group, [permission.key], on === true)}
                       />
@@ -180,38 +236,14 @@ export function RoleForm({
         })}
       </div>
 
-      {readOnly ? null : (
-        <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap items-center gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur">
-          {state.message && !state.success ? <FieldError className="mr-auto">{state.message}</FieldError> : null}
-          {saved ? (
-            <>
-              <Button type="button" variant="ghost" className="text-destructive" onClick={() => setDeleting(true)}>
-                <Trash2 data-icon="inline-start" />
-                Delete
-              </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link href={`/roles/new?from=${role.id}`}>
-                  <Copy data-icon="inline-start" />
-                  Duplicate
-                </Link>
-              </Button>
-            </>
-          ) : null}
-          <Button type="submit" disabled={pending} className="ml-auto">
-            {pending ? "Saving…" : saved ? "Save changes" : "Add role"}
-          </Button>
-        </div>
-      )}
-      {saved ? (
-        <ConfirmDeleteDialog
-          open={deleting}
-          onOpenChange={setDeleting}
-          title={`Delete ${role.name}?`}
-          description="Only a role nobody has can be deleted. This can't be undone."
-          action={() => deleteRole(role.id)}
-          onDeleted={() => router.push("/roles")}
-        />
-      ) : null}
+      <ConfirmDeleteDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Delete ${saved.name}?`}
+        description="Only a role nobody has can be deleted. This can't be undone."
+        action={() => deleteRole(role.id)}
+        onDeleted={() => router.push("/roles")}
+      />
     </form>
   );
 }
