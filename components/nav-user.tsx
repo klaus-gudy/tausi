@@ -1,18 +1,29 @@
+import { connection } from "next/server"
+
 import { NavUserMenu } from "@/components/nav-user-menu"
 import { SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getCurrentUser } from "@/lib/auth"
+import { readActiveMember } from "@/lib/membership"
 
 // The signed-in user for the sidebar footer, with a menu to log out. Reads
 // the session, so render it inside <Suspense fallback={<NavUserSkeleton />}>.
 export async function NavUser() {
   const user = await getCurrentUser()
+  // The role is read fresh, so a changed role shows on the next page.
+  await connection()
+  const member = await readActiveMember()
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
         <NavUserMenu
-          user={{ name: user.name, email: user.email, avatarUrl: user.avatarUrl }}
+          user={{
+            name: user.name,
+            email: user.email,
+            avatarUrl: user.avatarUrl,
+            roleName: member?.role.name ?? null,
+          }}
         />
       </SidebarMenuItem>
     </SidebarMenu>
