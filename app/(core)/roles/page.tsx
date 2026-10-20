@@ -6,6 +6,7 @@ import { Plus, ShieldCheck } from "lucide-react";
 
 import { readPermissionChoices } from "./data";
 import { NoAccessState } from "@/components/no-access-state";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -19,7 +20,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCount } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
-import type { PermissionModule } from "@/lib/permissions";
 import { getPrisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -70,6 +70,7 @@ async function Roles() {
   ]);
 
   const memberCounts = new Map(counts.map((row) => [row.roleId, row._count]));
+  const total = modules.reduce((sum, group) => sum + group.permissions.length, 0);
 
   // Owner first, then the organization's own by name.
   const ordered = [...roles].sort((a, b) => Number(!!a.organizationId) - Number(!!b.organizationId));
@@ -89,6 +90,7 @@ async function Roles() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {ordered.map((role) => {
           const keys = new Set(role.permissions.map((grant) => grant.permissionKey));
+          const touched = modules.filter((group) => group.permissions.some((p) => keys.has(p.key)));
           const members = memberCounts.get(role.id) ?? 0;
           const description = role.description ?? (role.organizationId ? "No description" : "Can do everything");
           return (
@@ -104,11 +106,22 @@ async function Roles() {
                     {description}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="mt-auto">
-                  <ModuleDots modules={modules} keys={keys} />
+                <CardContent className="mt-auto flex flex-wrap gap-1">
+                  {touched.length ? (
+                    touched.map((group) => (
+                      <Badge key={group.key} variant="outline" className="h-5 px-1.5 text-[11px]">
+                        {group.label}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No permissions yet</span>
+                  )}
                 </CardContent>
-                <CardFooter className="text-sm text-muted-foreground tabular-nums">
-                  {members === 1 ? "1 member" : `${formatCount(members)} members`}
+                <CardFooter className="justify-between gap-2 py-2 text-xs text-muted-foreground tabular-nums">
+                  <span>{members === 1 ? "1 member" : `${formatCount(members)} members`}</span>
+                  <span>
+                    {formatCount(keys.size)} of {formatCount(total)} permissions
+                  </span>
                 </CardFooter>
               </Card>
             </Link>
@@ -140,38 +153,5 @@ async function Roles() {
         </Empty>
       ) : null}
     </>
-  );
-}
-
-const DOT = {
-  full: "bg-primary",
-  partial: "border border-primary bg-primary/25",
-  none: "bg-muted-foreground/20",
-};
-
-/**
- * One dot per module: solid when the role has all of it, outlined when it has
- * some, grey when none. Hovering a dot names the module.
- */
-function ModuleDots({ modules, keys }: { modules: PermissionModule[]; keys: Set<string> }) {
-  const access = modules.map((group) => {
-    const held = group.permissions.filter((p) => keys.has(p.key)).length;
-    const level = held === group.permissions.length ? "full" : held ? "partial" : "none";
-    return { group, level } as const;
-  });
-  const label = (level: keyof typeof DOT) => ({ full: "full access", partial: "some access", none: "no access" })[level];
-  return (
-    <div className="flex items-center gap-1.5">
-      {access.map(({ group, level }) => (
-        <span
-          key={group.key}
-          title={`${group.label}: ${label(level)}`}
-          className={`size-2 rounded-full ${DOT[level]}`}
-        />
-      ))}
-      <span className="sr-only">
-        {access.map(({ group, level }) => `${group.label}: ${label(level)}`).join(", ")}
-      </span>
-    </div>
   );
 }
