@@ -5,6 +5,7 @@ import { ChevronsUpDown, LogOut } from "lucide-react"
 
 import { signOut } from "@/app/(auth)/actions"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +16,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar"
 
-type User = { name: string | null; email: string; avatarUrl: string | null }
+type User = {
+  name: string | null
+  email: string
+  avatarUrl: string | null
+  /** The role in the active organization, if there is one. */
+  roleName: string | null
+}
 
 function initials(name: string | null, email: string) {
   const words = (name || email).split(/[\s@.]+/).filter(Boolean)
@@ -33,7 +40,14 @@ function UserSummary({ user }: { user: User }) {
         <AvatarFallback className="rounded-lg">{initials(user.name, user.email)}</AvatarFallback>
       </Avatar>
       <div className="grid flex-1 text-left text-sm leading-tight">
-        <span className="truncate font-medium">{user.name || user.email}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate font-medium">{user.name || user.email}</span>
+          {user.roleName ? (
+            <Badge variant="secondary" className="h-4 shrink-0 px-1.5 text-[10px]">
+              {user.roleName}
+            </Badge>
+          ) : null}
+        </span>
         <span className="truncate text-xs text-muted-foreground">{user.email}</span>
       </div>
     </>
