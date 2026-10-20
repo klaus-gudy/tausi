@@ -1,36 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { saveRole } from "./actions";
+import { deleteRole, saveRole, type SaveRoleResult } from "./actions";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-} from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useFormAction } from "@/hooks/use-form-action";
-import type { ActionResult } from "@/lib/inventory";
 import type { PermissionModule } from "@/lib/permissions";
 
 export type EditableRole = {
+  /** Empty for a role that isn't saved yet. */
   id: string;
   name: string;
   description: string | null;
@@ -44,84 +31,32 @@ export type PermissionChoices = {
   grantable: string[];
 };
 
-const initialState: ActionResult = { message: "" };
-
-/** The "New role" button and its dialog. */
-export function AddRoleDialog({ choices }: { choices: PermissionChoices }) {
-  const [open, setOpen] = useState(false);
-  // Remounting the form clears it for the next role.
-  const [formKey, setFormKey] = useState(0);
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setFormKey((key) => key + 1);
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button>
-          <Plus data-icon="inline-start" />
-          New role
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
-        <RoleForm key={formKey} choices={choices} onSaved={() => setOpen(false)} />
-      </DialogContent>
-    </Dialog>
-  );
-}
+const initialState: SaveRoleResult = { message: "" };
 
 /**
- * Edits a custom role, or starts a new one from a copy of any role when
- * `copy` is set; opened from the role's row menu.
+ * A role's name and its permissions, module by module. The same page shows a
+ * role and sets it: read-only for the owner role and for members who can't
+ * manage roles.
  */
-export function EditRoleDialog({
-  role,
-  copy,
-  choices,
-  open,
-  onOpenChange,
-}: {
-  role: EditableRole;
-  copy?: boolean;
-  choices: PermissionChoices;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
-        {open ? (
-          <RoleForm
-            role={copy ? { ...role, id: "", name: `${role.name} copy` } : role}
-            choices={choices}
-            onSaved={() => onOpenChange(false)}
-          />
-        ) : null}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function RoleForm({
+export function RoleForm({
   role,
   choices,
-  onSaved,
+  readOnly = false,
 }: {
   role?: EditableRole;
   choices: PermissionChoices;
-  onSaved: () => void;
+  readOnly?: boolean;
 }) {
-  const grantable = new Set(choices.grantable);
+  const router = useRouter();
+  const grantable = new Set(readOnly ? [] : choices.grantable);
   const [checked, setChecked] = useState(() => new Set(role?.permissions ?? []));
+  const [deleting, setDeleting] = useState(false);
   const [state, onSubmit, pending] = useFormAction(
-    async (previous: ActionResult, formData: FormData) => {
+    async (previous: SaveRoleResult, formData: FormData) => {
       const result = await saveRole(previous, formData);
       if (result.success) {
         toast.success(result.message);
-        onSaved();
+        if (!role?.id && result.id) router.push(`/roles/${result.id}`);
       }
       return result;
     },
@@ -150,22 +85,20 @@ function RoleForm({
     });
   }
 
-  const editing = !!role?.id;
+  const saved = !!role?.id;
 
   return (
-    <form onSubmit={onSubmit}>
-      <DialogHeader>
-        <DialogTitle>{editing ? "Edit role" : "New role"}</DialogTitle>
-        <DialogDescription>
-          Name the role, then pick what people with it can do in each part of the app.
-        </DialogDescription>
-      </DialogHeader>
-      {editing ? <input type="hidden" name="id" value={role.id} /> : null}
+    <form onSubmit={onSubmit} className="grid gap-4">
+      {saved ? <input type="hidden" name="id" value={role.id} /> : null}
       {[...checked].map((key) => (
         <input key={key} type="hidden" name="permissions" value={key} />
       ))}
-      <FieldGroup className="gap-6 py-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
+          <CardDescription>What the role is called and who it&apos;s for.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="role-name">Name</FieldLabel>
             <Input
@@ -175,6 +108,7 @@ function RoleForm({
               placeholder="Storekeeper"
               autoComplete="off"
               maxLength={60}
+              readOnly={readOnly}
               required
             />
           </Field>
@@ -186,25 +120,26 @@ function RoleForm({
               id="role-description"
               name="description"
               defaultValue={role?.description ?? ""}
-              placeholder="Receives and counts stock"
+              placeholder={readOnly ? "" : "Receives and counts stock"}
               autoComplete="off"
               maxLength={200}
+              readOnly={readOnly}
             />
           </Field>
-        </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
         {choices.modules.map((group) => {
           const keys = group.permissions.map((p) => p.key);
-          const ticked = keys.filter((key) => checked.has(key)).length;
-          const all = ticked === keys.length;
-          const id = `role-group-${group.key}`;
+          const all = keys.every((key) => checked.has(key));
+          const id = `role-module-${group.key}`;
           return (
-            <FieldSet key={group.key} className="gap-3 rounded-lg border p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="grid gap-1">
-                  <FieldLegend variant="label" className="mb-0">
-                    {group.label}
-                  </FieldLegend>
-                  <FieldDescription className="text-xs">{group.description}</FieldDescription>
+            <Card key={group.key}>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div className="grid gap-1.5">
+                  <CardTitle>{group.label}</CardTitle>
+                  <CardDescription>{group.description}</CardDescription>
                 </div>
                 <Field orientation="horizontal" className="w-auto shrink-0">
                   <Checkbox
@@ -217,8 +152,8 @@ function RoleForm({
                     All
                   </FieldLabel>
                 </Field>
-              </div>
-              <div className="grid gap-2.5">
+              </CardHeader>
+              <CardContent className="grid gap-2.5">
                 {group.permissions.map((permission) => {
                   const permissionId = `role-permission-${permission.key}`;
                   const allowed = grantable.has(permission.key);
@@ -232,24 +167,51 @@ function RoleForm({
                       />
                       <FieldLabel htmlFor={permissionId} className="font-normal">
                         {permission.label}
-                        {!allowed ? (
+                        {!allowed && !readOnly ? (
                           <span className="text-xs text-muted-foreground"> · you don&apos;t have this</span>
                         ) : null}
                       </FieldLabel>
                     </Field>
                   );
                 })}
-              </div>
-            </FieldSet>
+              </CardContent>
+            </Card>
           );
         })}
-        {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
-      </FieldGroup>
-      <DialogFooter>
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : editing ? "Save changes" : "Add role"}
-        </Button>
-      </DialogFooter>
+      </div>
+
+      {readOnly ? null : (
+        <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap items-center gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur">
+          {state.message && !state.success ? <FieldError className="mr-auto">{state.message}</FieldError> : null}
+          {saved ? (
+            <>
+              <Button type="button" variant="ghost" className="text-destructive" onClick={() => setDeleting(true)}>
+                <Trash2 data-icon="inline-start" />
+                Delete
+              </Button>
+              <Button type="button" variant="outline" asChild>
+                <Link href={`/roles/new?from=${role.id}`}>
+                  <Copy data-icon="inline-start" />
+                  Duplicate
+                </Link>
+              </Button>
+            </>
+          ) : null}
+          <Button type="submit" disabled={pending} className="ml-auto">
+            {pending ? "Saving…" : saved ? "Save changes" : "Add role"}
+          </Button>
+        </div>
+      )}
+      {saved ? (
+        <ConfirmDeleteDialog
+          open={deleting}
+          onOpenChange={setDeleting}
+          title={`Delete ${role.name}?`}
+          description="Only a role nobody has can be deleted. This can't be undone."
+          action={() => deleteRole(role.id)}
+          onDeleted={() => router.push("/roles")}
+        />
+      ) : null}
     </form>
   );
 }
