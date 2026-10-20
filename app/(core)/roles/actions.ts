@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { Prisma } from "@/lib/generated/prisma/client";
-import { isUniqueViolation, memberWith, notAllowed, readText, type ActionResult } from "@/lib/inventory";
+import { isUniqueViolation, isUuid, memberWith, notAllowed, readText, type ActionResult } from "@/lib/inventory";
 import { SYSTEM_ROLES } from "@/lib/membership";
 import { withReadKeys } from "@/lib/permissions";
 import { placeKey } from "@/lib/places";
@@ -14,10 +14,81 @@ import { getPrisma } from "@/lib/prisma";
 
 export type SaveRoleResult = ActionResult & { id?: string };
 
+/** The organization's roles and owner, for checking a name is free. */
+async function readRoleNames(organizationId: string) {
+  return getPrisma().role.findMany({
+    where: { OR: [{ organizationId: null }, { organizationId }] },
+    select: { id: true, key: true, name: true },
+  });
+}
+
+function nameTaken(roles: { id: string; name: string }[], name: string, id?: string | null) {
+  return roles.some((role) => role.id !== id && role.name.toLowerCase() === name.toLowerCase());
+}
+
 /**
- * Adds a custom role, or edits one when the form carries its id. You can
- * only grant or take away permissions you have yourself: any the role has
- * that you don't are kept as they are.
+ * Adds a role with just a name and description; its permissions are set on
+ * its own page. With `from`, it starts as a copy of that role's permissions,
+ * leaving out any you don't have yourself.
+ */
+export async function createRole(_previous: SaveRoleResult, formData: FormData): Promise<SaveRoleResult> {
+  const member = await memberWith("roles.manage");
+  if (!member) return notAllowed;
+
+  const name = readText(formData.get("name"), 60);
+  const description = readText(formData.get("description"), 200);
+  const from = readText(formData.get("from"));
+  if (!name) return { message: "Enter the role's name." };
+
+  const prisma = getPrisma();
+  const organizationId = member.organization.id;
+  const [roles, source] = await Promise.all([
+    readRoleNames(organizationId),
+    from && isUuid(from)
+      ? prisma.role.findFirst({
+          where: { id: from, OR: [{ organizationId: null, key: "owner" }, { organizationId }] },
+          select: { description: true, permissions: { select: { permissionKey: true } } },
+        })
+      : null,
+  ]);
+  if (from && !source) return { message: "The role you're copying no longer exists." };
+  if (nameTaken(roles, name)) return { message: `There's already a role called ${name}.` };
+
+  const keys = (source?.permissions ?? [])
+    .map((grant) => grant.permissionKey)
+    .filter((key) => member.permissions.has(key));
+  // The key is only an internal handle, so it's made once and never changes;
+  // it must not be a system role's, which the code checks for.
+  const taken = new Set([...SYSTEM_ROLES, ...roles.map((role) => role.key)]);
+  const base = placeKey(name) || "role";
+  let key = base;
+  for (let n = 2; taken.has(key); n++) key = `${base}-${n}`;
+
+  let id: string;
+  try {
+    ({ id } = await prisma.role.create({
+      select: { id: true },
+      data: {
+        organizationId,
+        key,
+        name,
+        description: description ?? source?.description ?? null,
+        permissions: { create: keys.map((permissionKey) => ({ permissionKey })) },
+      },
+    }));
+  } catch (error) {
+    if (isUniqueViolation(error)) return { message: "That role was just added. Try again in a moment." };
+    throw error;
+  }
+
+  revalidatePath("/roles");
+  return { success: true, message: `${name} added.`, id };
+}
+
+/**
+ * Saves a role's name, description and permissions. You can only grant or
+ * take away permissions you have yourself: any the role has that you don't
+ * are kept as they are.
  */
 export async function saveRole(_previous: SaveRoleResult, formData: FormData): Promise<SaveRoleResult> {
   const member = await memberWith("roles.manage");
@@ -26,73 +97,40 @@ export async function saveRole(_previous: SaveRoleResult, formData: FormData): P
   const id = readText(formData.get("id"));
   const name = readText(formData.get("name"), 60);
   const description = readText(formData.get("description"), 200);
+  if (!id) return { message: "That role no longer exists." };
   if (!name) return { message: "Enter the role's name." };
 
   const prisma = getPrisma();
   const organizationId = member.organization.id;
   const [existing, roles, known] = await Promise.all([
-    id
-      ? prisma.role.findFirst({
-          where: { id, organizationId },
-          select: { permissions: { select: { permissionKey: true } } },
-        })
-      : null,
-    prisma.role.findMany({
-      where: { OR: [{ organizationId: null }, { organizationId }] },
-      select: { id: true, key: true, name: true },
+    prisma.role.findFirst({
+      where: { id, organizationId },
+      select: { permissions: { select: { permissionKey: true } } },
     }),
+    readRoleNames(organizationId),
     prisma.permission.findMany({ select: { key: true } }),
   ]);
-  if (id && !existing) return { message: "That role no longer exists." };
-  if (roles.some((role) => role.id !== id && role.name.toLowerCase() === name.toLowerCase())) {
-    return { message: `There's already a role called ${name}.` };
-  }
+  if (!existing) return { message: "That role no longer exists." };
+  if (nameTaken(roles, name, id)) return { message: `There's already a role called ${name}.` };
 
   const knownKeys = new Set(known.map((permission) => permission.key));
   const requested = withReadKeys(formData.getAll("permissions").map(String));
-  const kept = (existing?.permissions ?? [])
+  const kept = existing.permissions
     .map((grant) => grant.permissionKey)
     .filter((key) => !member.permissions.has(key));
   const keys = [
     ...new Set([...[...requested].filter((key) => knownKeys.has(key) && member.permissions.has(key)), ...kept]),
   ];
-  if (!keys.length) return { message: "Pick at least one permission." };
 
-  let savedId = id;
-  try {
-    if (id) {
-      await prisma.$transaction([
-        prisma.role.update({ where: { id }, data: { name, description } }),
-        prisma.rolePermission.deleteMany({ where: { roleId: id } }),
-        prisma.rolePermission.createMany({ data: keys.map((permissionKey) => ({ roleId: id, permissionKey })) }),
-      ]);
-    } else {
-      // The key is only an internal handle, so it's made once and never
-      // changes; it must not be a system role's, which the code checks for.
-      const taken = new Set([...SYSTEM_ROLES, ...roles.map((role) => role.key)]);
-      const base = placeKey(name) || "role";
-      let key = base;
-      for (let n = 2; taken.has(key); n++) key = `${base}-${n}`;
-      const created = await prisma.role.create({
-        select: { id: true },
-        data: {
-          organizationId,
-          key,
-          name,
-          description,
-          permissions: { create: keys.map((permissionKey) => ({ permissionKey })) },
-        },
-      });
-      savedId = created.id;
-    }
-  } catch (error) {
-    if (isUniqueViolation(error)) return { message: "That role was just added. Try again in a moment." };
-    throw error;
-  }
+  await prisma.$transaction([
+    prisma.role.update({ where: { id }, data: { name, description } }),
+    prisma.rolePermission.deleteMany({ where: { roleId: id } }),
+    prisma.rolePermission.createMany({ data: keys.map((permissionKey) => ({ roleId: id, permissionKey })) }),
+  ]);
 
   // Members with this role see the change on their next page.
   revalidatePath("/", "layout");
-  return { success: true, message: id ? `${name} saved.` : `${name} added.`, id: savedId ?? undefined };
+  return { success: true, message: `${name} saved.`, id };
 }
 
 /**
