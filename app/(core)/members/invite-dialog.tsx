@@ -25,7 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
-type Role = { id: string; key: string; name: string };
+type Role = { id: string; key: string; name: string; organizationId: string | null };
 
 const initialState: InviteState = { message: "" };
 
@@ -83,7 +83,8 @@ function InviteForm({
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState(inviteAndCopy, initialState);
-  const defaultRole = roles.find((role) => role.key === "member") ?? roles[0];
+  // Owner is only a fallback: most people are invited with a custom role.
+  const defaultRole = roles.find((role) => role.organizationId) ?? roles[0];
 
   if (state.success && state.link) {
     return (
