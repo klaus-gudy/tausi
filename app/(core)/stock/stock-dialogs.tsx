@@ -42,6 +42,7 @@ export type StockProduct = {
   size: string | null;
   onHand: number;
 };
+export type StockWarehouse = { id: string; name: string };
 export type StockDealer = { id: string; name: string; region: string | null };
 
 type Action = (previous: ActionResult, formData: FormData) => Promise<ActionResult>;
@@ -192,15 +193,29 @@ function ProductLines({
   );
 }
 
-export function ReceiveStockDialog({ products }: { products: StockProduct[] }) {
+export function ReceiveStockDialog({
+  products,
+  warehouses,
+}: {
+  products: StockProduct[];
+  warehouses: StockWarehouse[];
+}) {
   return (
     <FormDialog label="Receive stock" icon={<PackagePlus data-icon="inline-start" />}>
-      {(close) => <ReceiveForm products={products} onDone={close} />}
+      {(close) => <ReceiveForm products={products} warehouses={warehouses} onDone={close} />}
     </FormDialog>
   );
 }
 
-function ReceiveForm({ products, onDone }: { products: StockProduct[]; onDone: () => void }) {
+function ReceiveForm({
+  products,
+  warehouses,
+  onDone,
+}: {
+  products: StockProduct[];
+  warehouses: StockWarehouse[];
+  onDone: () => void;
+}) {
   const [state, onSubmit, pending] = useDialogAction(receiveStock, onDone);
   const day = today();
 
@@ -211,6 +226,26 @@ function ReceiveForm({ products, onDone }: { products: StockProduct[]; onDone: (
         <DialogDescription>Record what arrived from a supplier. It adds to stock on hand.</DialogDescription>
       </DialogHeader>
       <FieldGroup className="py-4">
+        {warehouses.length ? (
+          <Field>
+            <FieldLabel htmlFor="receive-warehouse">Warehouse</FieldLabel>
+            <NativeSelect
+              id="receive-warehouse"
+              name="warehouseId"
+              defaultValue={warehouses[0].id}
+              className="w-full"
+              required
+            >
+              {warehouses.map((warehouse) => (
+                <NativeSelectOption key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+        ) : (
+          <FieldDescription>Add a warehouse under Warehouses before receiving stock.</FieldDescription>
+        )}
         <div className="grid gap-5 sm:grid-cols-3">
           <Field>
             <FieldLabel htmlFor="receive-supplier">Supplier</FieldLabel>
@@ -233,7 +268,7 @@ function ReceiveForm({ products, onDone }: { products: StockProduct[]; onDone: (
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending || !warehouses.length}>
           {pending ? "Recording…" : "Record receipt"}
         </Button>
       </DialogFooter>
