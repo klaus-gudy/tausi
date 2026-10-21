@@ -83,21 +83,21 @@ async function SuperDealers({
     }),
     prisma.superDealer.count({ where: { organizationId, deactivatedAt: null } }),
     prisma.superDealer.count({ where: { organizationId, deactivatedAt: { not: null } } }),
-    // Reversals of an issue carry the same dealer, so the sum nets them out.
+    // What each dealer holds; reversals of an issue net out of the sum.
     prisma.stockMovement.groupBy({
       by: ["superDealerId"],
-      where: { organizationId, superDealerId: { not: null } },
+      where: { organizationId, holder: "super_dealer" },
       _sum: { quantity: true },
     }),
     prisma.stockMovement.groupBy({
       by: ["superDealerId"],
-      where: { organizationId, type: "issued" },
+      where: { organizationId, holder: "super_dealer", type: { in: ["issued", "distributed"] } },
       _max: { occurredOn: true },
     }),
     canManage ? readPlaces(organizationId) : [],
   ]);
   dealers.sort(byDealerName);
-  const issued = new Map(issuedTotals.map((row) => [row.superDealerId, 0 - (row._sum.quantity ?? 0)]));
+  const issued = new Map(issuedTotals.map((row) => [row.superDealerId, row._sum.quantity ?? 0]));
   const lastIssued = new Map(lastIssues.map((row) => [row.superDealerId, row._max.occurredOn]));
 
   return (
