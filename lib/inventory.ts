@@ -3,7 +3,8 @@ import { readActiveMember } from "@/lib/membership"
 import { getPrisma } from "@/lib/prisma"
 
 // Shared by the products, super dealers and stock pages. Stock on hand is
-// never stored: it is the sum of a product's stock movements.
+// never stored: it is the sum of a product's stock movements held by
+// warehouses.
 
 export type ActionResult = { success?: boolean; message: string }
 
@@ -42,28 +43,46 @@ export function readDay(value: FormDataEntryValue | null) {
   return day.getTime() <= Date.now() + 24 * 60 * 60 * 1000 ? day : null
 }
 
-/** Stock on hand per product id; products without movements are missing (0). */
+/** Stock on hand in all warehouses per product id; products without movements are missing (0). */
 export async function stockOnHand(
   organizationId: string,
   client: Prisma.TransactionClient = getPrisma()
 ) {
   const sums = await client.stockMovement.groupBy({
     by: ["productId"],
-    where: { organizationId },
+    where: { organizationId, holder: "warehouse" },
     _sum: { quantity: true },
   })
   return new Map(sums.map((row) => [row.productId, row._sum.quantity ?? 0]))
 }
 
 /**
+ * The warehouse the stock page records against until it lets you pick one:
+ * the organization's first active warehouse, or null when it has none.
+ */
+export async function defaultWarehouse(
+  organizationId: string,
+  client: Prisma.TransactionClient = getPrisma()
+) {
+  return client.warehouse.findFirst({
+    where: { organizationId, deactivatedAt: null },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true, name: true },
+  })
+}
+
+export const noWarehouse: ActionResult = { message: "Add a warehouse under Warehouses first." }
+
+/**
  * Locks the organization's products with these ids, in a fixed order so two
- * transactions can't deadlock, and returns them with their stock on hand.
- * Anything that removes stock runs under this lock, so two issues can't both
- * spend the same units.
+ * transactions can't deadlock, and returns them with their stock on hand in
+ * `warehouseId`. Anything that removes stock runs under this lock, so two
+ * issues can't both spend the same units.
  */
 export async function lockProducts(
   tx: Prisma.TransactionClient,
   organizationId: string,
+  warehouseId: string,
   productIds: string[]
 ) {
   const ids = [...new Set(productIds)].sort()
@@ -81,7 +100,7 @@ export async function lockProducts(
     }),
     tx.stockMovement.groupBy({
       by: ["productId"],
-      where: { productId: { in: rows.map((row) => row.id) } },
+      where: { productId: { in: rows.map((row) => row.id) }, holder: "warehouse", warehouseId },
       _sum: { quantity: true },
     }),
   ])
