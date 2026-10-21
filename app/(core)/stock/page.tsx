@@ -30,7 +30,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import type { StockMovementType } from "@/lib/generated/prisma/client";
 import { byDealerName, dealerName } from "@/lib/dealers";
 import { formatCount, formatDay, formatSigned } from "@/lib/format";
-import { stockOnHand } from "@/lib/inventory";
+import { receivingWarehouses, stockOnHand } from "@/lib/inventory";
 import { shownCount } from "@/lib/list-size";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -92,12 +92,13 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
   const { permissions } = member;
 
   const prisma = getPrisma();
-  const [products, dealers, onHand, movementCount] = await Promise.all([
+  const [products, warehouses, dealers, onHand, movementCount] = await Promise.all([
     prisma.product.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, code: true, size: true },
     }),
+    permissions.has("stock.receive") ? receivingWarehouses(organizationId) : [],
     permissions.has("stock.issue")
       ? prisma.superDealer.findMany({
           where: { organizationId, deactivatedAt: null },
@@ -130,7 +131,7 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
     <>
       {products.length ? (
         <div className="flex flex-wrap gap-2">
-          {permissions.has("stock.receive") ? <ReceiveStockDialog products={stockProducts} /> : null}
+          {permissions.has("stock.receive") ? <ReceiveStockDialog products={stockProducts} warehouses={warehouses} /> : null}
           {permissions.has("stock.issue") ? (
             <IssueStockDialog products={stockProducts} dealers={stockDealers} />
           ) : null}
