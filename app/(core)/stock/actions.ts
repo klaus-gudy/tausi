@@ -23,8 +23,8 @@ import { getPrisma } from "@/lib/prisma";
 // Every change to stock is a new stock_movements row; nothing here edits or
 // deletes one. Anything that removes stock locks the products first and
 // checks there is enough, so concurrent issues can't take stock below zero.
-// Stock is recorded against the organization's first warehouse until these
-// forms let you pick one.
+// Receipts go to the warehouse picked on the form; issues and counts still use
+// the organization's first warehouse until those forms let you pick one.
 
 const MAX_LINES = 50;
 
@@ -56,6 +56,7 @@ function readLines(formData: FormData, withCost: boolean): Line[] | string {
 
 function revalidateInventory() {
   revalidatePath("/stock");
+  revalidatePath("/goods-received", "layout");
   revalidatePath("/products");
   revalidatePath("/super-dealers");
 }
@@ -79,8 +80,19 @@ export async function receiveStock(
 
   const organizationId = member.organization.id;
   const prisma = getPrisma();
-  const warehouse = await defaultWarehouse(organizationId);
-  if (!warehouse) return noWarehouse;
+  const warehouseId = String(formData.get("warehouseId") ?? "");
+  const warehouse = warehouseId
+    ? isUuid(warehouseId)
+      ? await prisma.warehouse.findFirst({
+          where: { id: warehouseId, organizationId },
+          select: { id: true, name: true, deactivatedAt: true },
+        })
+      : null
+    : await defaultWarehouse(organizationId);
+  if (!warehouse) return warehouseId ? { message: "That warehouse no longer exists." } : noWarehouse;
+  if ("deactivatedAt" in warehouse && warehouse.deactivatedAt) {
+    return { message: `${warehouse.name} is inactive. Reactivate it first.` };
+  }
   const products = await prisma.product.findMany({
     where: { organizationId, id: { in: lines.map((line) => line.productId) } },
     select: { id: true, name: true, archivedAt: true },
@@ -120,7 +132,10 @@ export async function receiveStock(
 
   revalidateInventory();
   const units = lines.reduce((sum, line) => sum + line.quantity, 0);
-  return { success: true, message: `Received ${plural(units, "unit")} of ${plural(lines.length, "product")}.` };
+  return {
+    success: true,
+    message: `Received ${plural(units, "unit")} of ${plural(lines.length, "product")} into ${warehouse.name}.`,
+  };
 }
 
 /** Records stock leaving the store for a super dealer. */
