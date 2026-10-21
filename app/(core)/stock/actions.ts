@@ -1,12 +1,15 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import {
+  defaultWarehouse,
   isUniqueViolation,
   isUuid,
   lockProducts,
   memberWith,
+  noWarehouse,
   notAllowed,
   readDay,
   readText,
@@ -20,6 +23,8 @@ import { getPrisma } from "@/lib/prisma";
 // Every change to stock is a new stock_movements row; nothing here edits or
 // deletes one. Anything that removes stock locks the products first and
 // checks there is enough, so concurrent issues can't take stock below zero.
+// Stock is recorded against the organization's first warehouse until these
+// forms let you pick one.
 
 const MAX_LINES = 50;
 
@@ -74,6 +79,8 @@ export async function receiveStock(
 
   const organizationId = member.organization.id;
   const prisma = getPrisma();
+  const warehouse = await defaultWarehouse(organizationId);
+  if (!warehouse) return noWarehouse;
   const products = await prisma.product.findMany({
     where: { organizationId, id: { in: lines.map((line) => line.productId) } },
     select: { id: true, name: true, archivedAt: true },
@@ -85,17 +92,30 @@ export async function receiveStock(
     if (product.archivedAt) return { message: `${product.name} is archived. Restore it first.` };
   }
 
-  const shared = {
-    organizationId,
-    type: "received" as const,
-    occurredOn,
-    supplier: readText(formData.get("supplier")),
-    reference: readText(formData.get("reference"), 100),
-    note: readText(formData.get("note"), 1000),
-    createdById: member.userId,
-  };
-  await prisma.stockMovement.createMany({
-    data: lines.map((line) => ({ ...shared, ...line })),
+  // The receipt holds the delivery's details; its movements are the lines.
+  await prisma.stockReceipt.create({
+    data: {
+      organizationId,
+      warehouseId: warehouse.id,
+      supplierName: readText(formData.get("supplier")),
+      reference: readText(formData.get("reference"), 100),
+      note: readText(formData.get("note"), 1000),
+      receivedOn: occurredOn,
+      receivedById: member.userId,
+      stockMovements: {
+        createMany: {
+          data: lines.map((line) => ({
+            ...line,
+            organizationId,
+            type: "received" as const,
+            holder: "warehouse" as const,
+            warehouseId: warehouse.id,
+            occurredOn,
+            createdById: member.userId,
+          })),
+        },
+      },
+    },
   });
 
   revalidateInventory();
@@ -132,31 +152,41 @@ export async function issueStock(
     });
     if (!dealer) return { message: "That dealer no longer exists." };
     if (dealer.deactivatedAt) return { message: `${dealerName(dealer)} is inactive. Reactivate them first.` };
+    const warehouse = await defaultWarehouse(organizationId, tx);
+    if (!warehouse) return noWarehouse;
 
-    const products = await lockProducts(tx, organizationId, [...wanted.keys()]);
+    const products = await lockProducts(tx, organizationId, warehouse.id, [...wanted.keys()]);
     if (products.length !== wanted.size) return { message: "One of those products no longer exists." };
     for (const product of products) {
       const quantity = wanted.get(product.id)!;
       if (product.archivedAt) return { message: `${product.name} is archived. Restore it first.` };
       if (quantity > product.onHand) {
         return {
-          message: `Only ${formatCount(product.onHand)} of ${product.name} on hand; you tried to issue ${formatCount(quantity)}.`,
+          message: `Only ${formatCount(product.onHand)} of ${product.name} on hand in ${warehouse.name}; you tried to issue ${formatCount(quantity)}.`,
         };
       }
     }
 
+    // Each product leaves the warehouse and arrives with the dealer: two rows
+    // sharing a transfer id.
     await tx.stockMovement.createMany({
-      data: [...wanted].map(([productId, quantity]) => ({
-        organizationId,
-        productId,
-        type: "issued" as const,
-        quantity: -quantity,
-        superDealerId,
-        occurredOn,
-        reference: readText(formData.get("reference"), 100),
-        note: readText(formData.get("note"), 1000),
-        createdById: member.userId,
-      })),
+      data: [...wanted].flatMap(([productId, quantity]) => {
+        const shared = {
+          organizationId,
+          productId,
+          type: "issued" as const,
+          superDealerId,
+          transferId: randomUUID(),
+          occurredOn,
+          reference: readText(formData.get("reference"), 100),
+          note: readText(formData.get("note"), 1000),
+          createdById: member.userId,
+        };
+        return [
+          { ...shared, holder: "warehouse" as const, warehouseId: warehouse.id, quantity: -quantity },
+          { ...shared, holder: "super_dealer" as const, quantity },
+        ];
+      }),
     });
     const units = [...wanted.values()].reduce((sum, quantity) => sum + quantity, 0);
     return { success: true, message: `Issued ${plural(units, "unit")} to ${dealerName(dealer)}.` };
@@ -188,7 +218,9 @@ export async function adjustStock(
 
   const organizationId = member.organization.id;
   const result = await getPrisma().$transaction(async (tx): Promise<ActionResult> => {
-    const [product] = await lockProducts(tx, organizationId, [productId]);
+    const warehouse = await defaultWarehouse(organizationId, tx);
+    if (!warehouse) return noWarehouse;
+    const [product] = await lockProducts(tx, organizationId, warehouse.id, [productId]);
     if (!product) return { message: "That product no longer exists." };
     const difference = counted - product.onHand;
     if (!difference) return { message: `${product.name} already has ${formatCount(counted)} on hand.` };
@@ -198,6 +230,8 @@ export async function adjustStock(
         organizationId,
         productId,
         type: "adjustment",
+        holder: "warehouse",
+        warehouseId: warehouse.id,
         quantity: difference,
         occurredOn,
         note,
@@ -214,7 +248,10 @@ export async function adjustStock(
   return result;
 }
 
-/** Undoes a movement entered by mistake with an opposite one; the original stays visible. */
+/**
+ * Undoes a warehouse movement entered by mistake with an opposite one; the
+ * original stays visible. Both rows of a transfer are reversed together.
+ */
 export async function reverseMovement(movementId: string): Promise<ActionResult> {
   const member = await memberWith("stock.adjust");
   if (!member) return notAllowed;
@@ -224,22 +261,21 @@ export async function reverseMovement(movementId: string): Promise<ActionResult>
   try {
     const result = await getPrisma().$transaction(async (tx): Promise<ActionResult> => {
       const movement = await tx.stockMovement.findFirst({
-        where: { id: movementId, organizationId },
+        where: { id: movementId, organizationId, holder: "warehouse" },
         select: {
-          id: true,
           type: true,
           productId: true,
           quantity: true,
-          superDealerId: true,
-          reference: true,
+          warehouseId: true,
+          transferId: true,
           reversedBy: { select: { id: true } },
         },
       });
-      if (!movement) return { message: "That movement no longer exists." };
+      if (!movement?.warehouseId) return { message: "That movement no longer exists." };
       if (movement.type === "reversal") return { message: "A reversal can't be reversed." };
       if (movement.reversedBy) return { message: "That movement was already reversed." };
 
-      const [product] = await lockProducts(tx, organizationId, [movement.productId]);
+      const [product] = await lockProducts(tx, organizationId, movement.warehouseId, [movement.productId]);
       if (!product) return { message: "That product no longer exists." };
       if (product.onHand - movement.quantity < 0) {
         return {
@@ -247,19 +283,35 @@ export async function reverseMovement(movementId: string): Promise<ActionResult>
         };
       }
 
+      const rows = await tx.stockMovement.findMany({
+        where: movement.transferId ? { transferId: movement.transferId } : { id: movementId },
+        select: {
+          id: true,
+          holder: true,
+          quantity: true,
+          warehouseId: true,
+          salespersonId: true,
+          superDealerId: true,
+          receiptId: true,
+          dispatchId: true,
+          saleId: true,
+          reference: true,
+        },
+      });
       const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
-      await tx.stockMovement.create({
-        data: {
+      const transferId = movement.transferId ? randomUUID() : null;
+      await tx.stockMovement.createMany({
+        data: rows.map(({ id, quantity, ...row }) => ({
+          ...row,
           organizationId,
           productId: movement.productId,
-          type: "reversal",
-          quantity: -movement.quantity,
-          superDealerId: movement.superDealerId,
-          reference: movement.reference,
-          reversesId: movement.id,
+          type: "reversal" as const,
+          quantity: -quantity,
+          transferId,
+          reversesId: id,
           occurredOn: today,
           createdById: member.userId,
-        },
+        })),
       });
       return { success: true, message: "Movement reversed." };
     });
