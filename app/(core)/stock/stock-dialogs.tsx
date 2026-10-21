@@ -114,6 +114,23 @@ function ProductLines({
 }) {
   const nextKey = useRef(1);
   const [lines, setLines] = useState([0]);
+  // What's typed on each line, by key, for the receipt total.
+  const [typed, setTyped] = useState<Record<number, { quantity: string; unitCost: string }>>({});
+  const type = (key: number, field: "quantity" | "unitCost", value: string) =>
+    setTyped((current) => ({
+      ...current,
+      [key]: { ...(current[key] ?? { quantity: "", unitCost: "" }), [field]: value },
+    }));
+  let units = 0;
+  let value = 0;
+  let uncosted = 0;
+  for (const key of lines) {
+    const quantity = Number(typed[key]?.quantity) || 0;
+    const unitCost = typed[key]?.unitCost;
+    units += quantity;
+    if (unitCost) value += quantity * Number(unitCost);
+    else if (quantity) uncosted += 1;
+  }
 
   return (
     <FieldSet>
@@ -155,6 +172,7 @@ function ProductLines({
               placeholder="Qty"
               aria-label={`Quantity, line ${index + 1}`}
               required={index === 0}
+              onChange={withCost ? (event) => type(key, "quantity", event.target.value) : undefined}
             />
             {withCost ? (
               <InputGroup className="col-span-2 sm:col-span-1 sm:col-start-3 row-start-2 sm:row-start-1">
@@ -162,6 +180,7 @@ function ProductLines({
                   name="unitCost"
                   placeholder="Unit cost"
                   aria-label={`Unit cost, line ${index + 1}`}
+                  onValueChange={(digits) => type(key, "unitCost", digits)}
                 />
               </InputGroup>
             ) : null}
@@ -189,6 +208,15 @@ function ProductLines({
           Add another product
         </Button>
       </div>
+      {withCost && units ? (
+        <FieldDescription className="tabular-nums">
+          {formatCount(units)} {units === 1 ? "unit" : "units"}
+          {value ? ` worth ${formatCount(value)}` : ""}
+          {value && uncosted
+            ? ` (${uncosted} ${uncosted === 1 ? "line has" : "lines have"} no unit cost)`
+            : ""}
+        </FieldDescription>
+      ) : null}
     </FieldSet>
   );
 }
