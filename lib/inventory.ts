@@ -71,6 +71,15 @@ export async function defaultWarehouse(
   })
 }
 
+/** Active warehouses stock can be received into, the default one first. */
+export async function receivingWarehouses(organizationId: string) {
+  return getPrisma().warehouse.findMany({
+    where: { organizationId, deactivatedAt: null },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true, name: true },
+  })
+}
+
 export const noWarehouse: ActionResult = { message: "Add a warehouse under Warehouses first." }
 
 /**
