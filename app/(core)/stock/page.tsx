@@ -45,6 +45,10 @@ const PAGE_SIZE = 50;
 const TYPE_NOUNS: Record<StockMovementType, string> = {
   received: "receipt",
   issued: "issue",
+  dispatched: "dispatch",
+  delivered: "delivery",
+  distributed: "sale",
+  returned: "return",
   adjustment: "adjustment",
   reversal: "reversal",
 };
@@ -52,6 +56,10 @@ const TYPE_NOUNS: Record<StockMovementType, string> = {
 const TYPE_LABELS: Record<StockMovementType, string> = {
   received: "Received",
   issued: "Issued",
+  dispatched: "Dispatched",
+  delivered: "Delivered",
+  distributed: "Sold",
+  returned: "Returned",
   adjustment: "Adjustment",
   reversal: "Reversal",
 };
@@ -103,7 +111,7 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
         })
       : [],
     stockOnHand(organizationId),
-    prisma.stockMovement.count({ where: { organizationId } }),
+    prisma.stockMovement.count({ where: { organizationId, holder: "warehouse" } }),
   ]);
   // The dealer picker shows "Shop · District, Region".
   const stockDealers = dealers.sort(byDealerName).map((dealer) => ({
@@ -232,8 +240,9 @@ async function Movements({
   }
 
   const canReverse = member.permissions.has("stock.adjust");
+  // The warehouses' side of each move; an issue's dealer side mirrors it.
   const movements = await getPrisma().stockMovement.findMany({
-    where: { organizationId: member.organization.id },
+    where: { organizationId: member.organization.id, holder: "warehouse" },
     orderBy: [{ occurredOn: "desc" }, { createdAt: "desc" }],
     take: shown,
     select: {
@@ -241,12 +250,12 @@ async function Movements({
       type: true,
       quantity: true,
       unitCost: true,
-      supplier: true,
       reference: true,
       note: true,
       occurredOn: true,
       product: { select: { name: true } },
       superDealer: { select: { shopName: true, contactName: true } },
+      receipt: { select: { supplierName: true, reference: true, note: true } },
       createdBy: { select: { name: true, email: true } },
       reversedBy: { select: { id: true } },
     },
@@ -273,8 +282,13 @@ async function Movements({
           <TableBody>
             {movements.map((movement) => {
               const counterpart =
-                (movement.superDealer && dealerName(movement.superDealer)) ?? movement.supplier ?? (movement.type === "adjustment" ? "Stock count" : "—");
-              const details = [movement.reference, movement.note].filter(Boolean).join(" · ");
+                (movement.superDealer && dealerName(movement.superDealer)) ?? movement.receipt?.supplierName ?? (movement.type === "adjustment" ? "Stock count" : "—");
+              const details = [
+                movement.reference ?? movement.receipt?.reference,
+                movement.note ?? movement.receipt?.note,
+              ]
+                .filter(Boolean)
+                .join(" · ");
               const summary = `the ${TYPE_NOUNS[movement.type]} of ${formatCount(Math.abs(movement.quantity))} ${movement.product.name}`;
               return (
                 <TableRow key={movement.id} className={movement.reversedBy ? "text-muted-foreground" : undefined}>
