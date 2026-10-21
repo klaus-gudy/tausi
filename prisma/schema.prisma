@@ -42,7 +42,14 @@ model User {
   authAccounts         AuthAccount[]
   sessions             Session[]
   verificationTokens   VerificationToken[]
-  stockMovements       StockMovement[]
+  stockMovements       StockMovement[]     @relation("StockMovementCreatedBy")
+  stockHeld            StockMovement[]     @relation("StockMovementSalesperson")
+  stockReceipts        StockReceipt[]
+  dispatchesSent       Dispatch[]          @relation("DispatchDispatchedBy")
+  dispatchesReceived   Dispatch[]          @relation("DispatchReceivedBy")
+  dispatchesAssigned   Dispatch[]          @relation("DispatchSalesperson")
+  sales                Sale[]
+  paymentsCollected    Payment[]
   productsCreated      Product[]           @relation("ProductCreatedBy")
   productsUpdated      Product[]           @relation("ProductUpdatedBy")
 
@@ -142,6 +149,10 @@ model Organization {
   superDealers   SuperDealer[]
   warehouses     Warehouse[]
   stockMovements StockMovement[]
+  stockReceipts  StockReceipt[]
+  dispatches     Dispatch[]
+  sales          Sale[]
+  payments       Payment[]
   zones          Zone[]
   regions        Region[]
   districts      District[]
@@ -327,14 +338,15 @@ model SuperDealer {
   region         Region?         @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
   district       District?       @relation(fields: [organizationId, regionKey, districtKey], references: [organizationId, regionKey, key], onDelete: NoAction)
   stockMovements StockMovement[]
+  sales          Sale[]
+  payments       Payment[]
 
   @@unique([organizationId, shopName])
   @@index([organizationId, regionKey])
   @@map("super_dealers")
 }
 
-// Where the organization keeps its stock. Stock isn't tracked per warehouse
-// yet; this records where each one is and roughly how much it holds.
+// Where the organization keeps its stock: the sum of the ledger rows it holds.
 model Warehouse {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
@@ -358,10 +370,13 @@ model Warehouse {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // Places are the organization's own, so the keys pair with organizationId.
-  region       Region?      @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
-  district     District?    @relation(fields: [organizationId, regionKey, districtKey], references: [organizationId, regionKey, key], onDelete: NoAction)
+  region         Region?         @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
+  district       District?       @relation(fields: [organizationId, regionKey, districtKey], references: [organizationId, regionKey, key], onDelete: NoAction)
+  stockMovements StockMovement[]
+  stockReceipts  StockReceipt[]
+  dispatches     Dispatch[]
 
   @@unique([organizationId, name])
   @@index([organizationId, regionKey])
@@ -369,11 +384,19 @@ model Warehouse {
 }
 
 enum StockMovementType {
-  // In from a supplier.
+  // In from a supplier, to a warehouse.
   received
-  // Out to a super dealer.
+  // Warehouse straight to a super dealer.
   issued
-  // A correction after a count, damage or loss; either direction.
+  // Warehouse to in transit, when a dispatch leaves.
+  dispatched
+  // In transit to the salesperson, when they acknowledge the dispatch.
+  delivered
+  // Salesperson to a super dealer, on a sale.
+  distributed
+  // Back up the chain: dealer to salesperson, salesperson to warehouse.
+  returned
+  // A correction after a count, damage, loss or transit shortage; either direction.
   adjustment
   // Cancels an earlier movement with the opposite quantity.
   reversal
@@ -381,21 +404,46 @@ enum StockMovementType {
   @@map("stock_movement_type")
 }
 
+// Whose stock a ledger row counts toward. The matching id is always set:
+// warehouseId, dispatchId (in transit), salespersonId or superDealerId.
+enum StockHolder {
+  warehouse
+  in_transit
+  salesperson
+  super_dealer
+
+  @@map("stock_holder")
+}
+
 // The stock ledger. Rows are never edited or deleted: a mistake is undone by
 // a reversal row, so the history always explains the current balance.
+//
+// Each row changes one holder's balance; a holder's stock is the sum of its
+// rows. Moving stock writes two rows sharing a transferId, -N from one holder
+// and +N to the other, so the organization's total only changes when stock is
+// received or adjusted. The other ids say who else took part: the warehouse
+// row of a dispatch also names the dispatch and the salesperson.
 model StockMovement {
   id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String            @map("organization_id") @db.Uuid
   productId      String            @map("product_id") @db.Uuid
   type           StockMovementType
-  // Signed: positive adds stock, negative removes it.
+  holder         StockHolder
+  // Signed: positive adds to the holder's stock, negative removes it.
   quantity       Int
   // Cost per unit paid to the supplier, for received stock.
   unitCost       Int?              @map("unit_cost")
+  // Price per unit charged to the dealer, for distributed stock.
+  unitPrice      Int?              @map("unit_price")
+  warehouseId    String?           @map("warehouse_id") @db.Uuid
+  salespersonId  String?           @map("salesperson_id") @db.Uuid
   superDealerId  String?           @map("super_dealer_id") @db.Uuid
-  // Supplier name for received stock.
-  supplier       String?
-  // Delivery note, invoice or dispatch number.
+  // The two rows of one move.
+  transferId     String?           @map("transfer_id") @db.Uuid
+  receiptId      String?           @map("receipt_id") @db.Uuid
+  dispatchId     String?           @map("dispatch_id") @db.Uuid
+  saleId         String?           @map("sale_id") @db.Uuid
+  // Issue or return number; receipts keep theirs on the receipt.
   reference      String?
   note           String?
   // The day it happened, which may be before it was recorded.
@@ -408,16 +456,172 @@ model StockMovement {
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   // NoAction, not Restrict: deleting an organization cascades through its
-  // dealers and movements together (see Membership.role).
+  // dealers, warehouses, documents and movements together (see Membership.role).
+  warehouse    Warehouse?     @relation(fields: [warehouseId], references: [id], onDelete: NoAction)
+  salesperson  User?          @relation("StockMovementSalesperson", fields: [salespersonId], references: [id], onDelete: Restrict)
   superDealer  SuperDealer?   @relation(fields: [superDealerId], references: [id], onDelete: NoAction)
+  receipt      StockReceipt?  @relation(fields: [receiptId], references: [id], onDelete: NoAction)
+  dispatch     Dispatch?      @relation(fields: [dispatchId], references: [id], onDelete: NoAction)
+  sale         Sale?          @relation(fields: [saleId], references: [id], onDelete: NoAction)
   reverses     StockMovement? @relation("StockReversal", fields: [reversesId], references: [id], onDelete: NoAction)
   reversedBy   StockMovement? @relation("StockReversal")
-  createdBy    User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy    User?          @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([organizationId, occurredOn])
+  @@index([organizationId, holder])
   @@index([productId])
+  @@index([warehouseId])
+  @@index([salespersonId])
   @@index([superDealerId])
+  @@index([transferId])
+  @@index([receiptId])
+  @@index([dispatchId])
+  @@index([saleId])
   @@map("stock_movements")
+}
+
+// A delivery from a supplier into a warehouse. Its received ledger rows are
+// its lines: product, quantity and unit cost.
+model StockReceipt {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  warehouseId    String   @map("warehouse_id") @db.Uuid
+  supplierName   String?  @map("supplier_name")
+  // Delivery note or invoice number.
+  reference      String?
+  note           String?
+  // The day it arrived, which may be before it was recorded.
+  receivedOn     DateTime @map("received_on") @db.Date
+  // The storekeeper who confirmed it.
+  receivedById   String?  @map("received_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warehouse      Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: NoAction)
+  receivedBy     User?           @relation(fields: [receivedById], references: [id], onDelete: Restrict)
+  stockMovements StockMovement[]
+
+  @@index([organizationId, receivedOn])
+  @@index([warehouseId])
+  @@map("stock_receipts")
+}
+
+enum DispatchStatus {
+  // Left the warehouse; the stock is held by the dispatch.
+  in_transit
+  // The salesperson acknowledged it; the stock is theirs.
+  received
+  // Called off before arrival; the stock went back to the warehouse.
+  cancelled
+
+  @@map("dispatch_status")
+}
+
+// A shipment from a warehouse to a salesperson. Its ledger rows say what was
+// sent and what arrived; any shortfall is an adjustment out of in transit.
+model Dispatch {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  // "DSP-0042"; unique among the organization's dispatches, ignoring case.
+  number         String         @db.Citext
+  warehouseId    String         @map("warehouse_id") @db.Uuid
+  salespersonId  String         @map("salesperson_id") @db.Uuid
+  // Where it is going; a salesperson may work in several regions.
+  regionKey      String         @map("region_key")
+  status         DispatchStatus @default(in_transit)
+  // Driver, vehicle or courier.
+  carrier        String?
+  note           String?
+  // The storekeeper who sent it.
+  dispatchedById String         @map("dispatched_by_id") @db.Uuid
+  dispatchedAt   DateTime       @map("dispatched_at") @db.Timestamptz
+  // Set when the salesperson acknowledges it.
+  receivedById   String?        @map("received_by_id") @db.Uuid
+  receivedAt     DateTime?      @map("received_at") @db.Timestamptz
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warehouse      Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: NoAction)
+  salesperson    User            @relation("DispatchSalesperson", fields: [salespersonId], references: [id], onDelete: Restrict)
+  // Places are the organization's own, so the key pairs with organizationId.
+  region         Region          @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
+  dispatchedBy   User            @relation("DispatchDispatchedBy", fields: [dispatchedById], references: [id], onDelete: Restrict)
+  receivedBy     User?           @relation("DispatchReceivedBy", fields: [receivedById], references: [id], onDelete: Restrict)
+  stockMovements StockMovement[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status])
+  @@index([warehouseId])
+  @@index([salespersonId])
+  @@map("dispatches")
+}
+
+enum PaymentTerms {
+  cash
+  credit
+
+  @@map("payment_terms")
+}
+
+// Stock a salesperson hands to a super dealer. Its distributed ledger rows
+// are its lines; totalAmount is what the dealer owes for them.
+model Sale {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  // "SAL-0042"; unique among the organization's sales, ignoring case.
+  number         String       @db.Citext
+  salespersonId  String       @map("salesperson_id") @db.Uuid
+  superDealerId  String       @map("super_dealer_id") @db.Uuid
+  terms          PaymentTerms
+  totalAmount    Int          @map("total_amount")
+  // When a credit sale should be paid.
+  dueOn          DateTime?    @map("due_on") @db.Date
+  note           String?
+  soldOn         DateTime     @map("sold_on") @db.Date
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salesperson    User            @relation(fields: [salespersonId], references: [id], onDelete: Restrict)
+  superDealer    SuperDealer     @relation(fields: [superDealerId], references: [id], onDelete: NoAction)
+  stockMovements StockMovement[]
+  payments       Payment[]
+
+  @@unique([organizationId, number])
+  @@index([superDealerId])
+  @@index([salespersonId])
+  @@map("sales")
+}
+
+// Money collected from a super dealer. Like the ledger, rows are never edited:
+// a mistake is corrected with a negative amount. A dealer's balance is their
+// sales' totals minus their payments.
+model Payment {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  superDealerId  String   @map("super_dealer_id") @db.Uuid
+  // The sale it pays for, when it pays for one.
+  saleId         String?  @map("sale_id") @db.Uuid
+  amount         Int
+  // cash, mobile_money or bank (checked in the database).
+  method         String
+  // Receipt, transaction or slip number.
+  reference      String?
+  note           String?
+  // The salesperson who collected it.
+  collectedById  String   @map("collected_by_id") @db.Uuid
+  receivedOn     DateTime @map("received_on") @db.Date
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  superDealer  SuperDealer  @relation(fields: [superDealerId], references: [id], onDelete: NoAction)
+  sale         Sale?        @relation(fields: [saleId], references: [id], onDelete: NoAction)
+  collectedBy  User         @relation(fields: [collectedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, receivedOn])
+  @@index([superDealerId])
+  @@index([saleId])
+  @@map("payments")
 }
 
 // ---------------------------------------------------------------------------
@@ -453,6 +657,7 @@ model Region {
   districts    District[]
   superDealers SuperDealer[]
   warehouses   Warehouse[]
+  dispatches   Dispatch[]
 
   @@id([organizationId, key])
   @@index([organizationId, zoneKey])
