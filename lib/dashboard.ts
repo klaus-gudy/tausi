@@ -14,15 +14,16 @@ export const TREND_WEEKS = 12
 
 /**
  * Every unit that reached a dealer, one row per line: straight from the store
- * (issues, less their reversals) or through a salesperson (deliveries).
+ * (the dealer side of issues, less their reversals) or through a salesperson
+ * (deliveries).
  */
 function supplyRows(organizationId: string) {
   return Prisma.sql`
     SELECT m.occurred_on AS day, m.super_dealer_id AS dealer_id, NULL::uuid AS salesperson_id,
-           -m.quantity AS units, -m.quantity::bigint * p.selling_price AS value
+           m.quantity AS units, m.quantity::bigint * p.selling_price AS value
     FROM stock_movements m
     JOIN products p ON p.id = m.product_id
-    WHERE m.organization_id = ${organizationId}::uuid AND m.super_dealer_id IS NOT NULL
+    WHERE m.organization_id = ${organizationId}::uuid AND m.holder = 'super_dealer'
     UNION ALL
     SELECT d.delivered_on, d.super_dealer_id, d.salesperson_id,
            l.quantity, l.quantity::bigint * p.selling_price
@@ -43,14 +44,14 @@ export async function readStoreStock(organizationId: string) {
       SELECT m.product_id, -SUM(m.quantity) AS units
       FROM stock_movements m
       LEFT JOIN stock_movements original ON original.id = m.reverses_id
-      WHERE m.organization_id = ${organizationId}::uuid
+      WHERE m.organization_id = ${organizationId}::uuid AND m.holder = 'warehouse'
         AND m.occurred_on > ${TODAY} - ${WINDOW_DAYS}::int
         AND (m.type IN ('issued', 'transferred')
              OR (m.type = 'reversal' AND original.type IN ('issued', 'transferred')))
       GROUP BY m.product_id
     )
     SELECT p.id, p.name, p.size, p.selling_price AS price,
-           COALESCE((SELECT SUM(quantity) FROM stock_movements WHERE product_id = p.id), 0) AS on_hand,
+           COALESCE((SELECT SUM(quantity) FROM stock_movements WHERE product_id = p.id AND holder = 'warehouse'), 0) AS on_hand,
            COALESCE(o.units, 0) AS out_30
     FROM products p
     LEFT JOIN outflow o ON o.product_id = p.id
