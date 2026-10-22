@@ -52,10 +52,10 @@ type Action = (previous: ActionResult, formData: FormData) => Promise<ActionResu
 const initialState: ActionResult = { message: "" };
 
 /** Today in the browser's time zone, which may differ from the server's. */
-const today = () => format(new Date(), "yyyy-MM-dd");
+export const today = () => format(new Date(), "yyyy-MM-dd");
 
 /** A button that opens a dialog holding a fresh form each time. */
-function FormDialog({
+export function FormDialog({
   label,
   icon,
   variant,
@@ -93,7 +93,7 @@ function FormDialog({
 }
 
 /** Runs `action`, and on success shows its message and closes the dialog. */
-function useDialogAction(action: Action, onDone: () => void) {
+export function useDialogAction(action: Action, onDone: () => void) {
   return useFormAction(async (previous: ActionResult, formData: FormData) => {
     const result = await action(previous, formData);
     if (result.success) {
@@ -104,15 +104,18 @@ function useDialogAction(action: Action, onDone: () => void) {
   }, initialState);
 }
 
-/** Product rows for a receive or issue form; submits parallel productId/quantity fields. */
-function ProductLines({
+/** Product rows for a receive, issue or transfer form; submits parallel productId/quantity fields. */
+export function ProductLines({
   products,
   withCost,
   showOnHand,
+  onHandLabel = "on hand",
 }: {
   products: StockProduct[];
   withCost: boolean;
   showOnHand: boolean;
+  /** What the count next to each product is, e.g. "with you". */
+  onHandLabel?: string;
 }) {
   const nextKey = useRef(1);
   const [lines, setLines] = useState([0]);
@@ -161,7 +164,7 @@ function ProductLines({
                 <NativeSelectOption key={product.id} value={product.id}>
                   {product.name}
                   {product.size ? ` · ${product.size}` : ""} ({product.code})
-                  {showOnHand ? ` · ${formatCount(product.onHand)} on hand` : ""}
+                  {showOnHand ? ` · ${formatCount(product.onHand)} ${onHandLabel}` : ""}
                 </NativeSelectOption>
               ))}
             </NativeSelect>

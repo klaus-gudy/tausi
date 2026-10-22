@@ -34,6 +34,7 @@ import { activeWarehouses, stockByWarehouse } from "@/lib/inventory";
 import { shownCount } from "@/lib/list-size";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
+import { transferNumber } from "@/lib/transfers";
 
 export const metadata: Metadata = {
   title: "Stock in & out",
@@ -45,23 +46,17 @@ const PAGE_SIZE = 50;
 const TYPE_NOUNS: Record<StockMovementType, string> = {
   received: "receipt",
   issued: "issue",
-  dispatched: "dispatch",
-  delivered: "delivery",
-  distributed: "sale",
-  returned: "return",
   adjustment: "adjustment",
   reversal: "reversal",
+  transferred: "transfer",
 };
 
 const TYPE_LABELS: Record<StockMovementType, string> = {
   received: "Received",
   issued: "Issued",
-  dispatched: "Dispatched",
-  delivered: "Delivered",
-  distributed: "Sold",
-  returned: "Returned",
   adjustment: "Adjustment",
   reversal: "Reversal",
+  transferred: "Transferred",
 };
 
 export default function StockPage({ searchParams }: PageProps<"/stock">) {
@@ -267,6 +262,7 @@ async function Movements({
       product: { select: { name: true } },
       superDealer: { select: { shopName: true, contactName: true } },
       receipt: { select: { supplierName: true, reference: true, note: true } },
+      transfer: { select: { number: true, salesperson: { select: { name: true } } } },
       createdBy: { select: { name: true, email: true } },
       reversedBy: { select: { id: true } },
     },
@@ -293,7 +289,10 @@ async function Movements({
           <TableBody>
             {movements.map((movement) => {
               const counterpart =
-                (movement.superDealer && dealerName(movement.superDealer)) ?? movement.receipt?.supplierName ?? (movement.type === "adjustment" ? "Stock count" : "—");
+                (movement.superDealer && dealerName(movement.superDealer)) ??
+                (movement.transfer && `${movement.transfer.salesperson.name} · ${transferNumber(movement.transfer.number)}`) ??
+                movement.receipt?.supplierName ??
+                (movement.type === "adjustment" ? "Stock count" : "—");
               const details = [
                 movement.reference ?? movement.receipt?.reference,
                 movement.note ?? movement.receipt?.note,
@@ -334,7 +333,8 @@ async function Movements({
                   </TableCell>
                   {canReverse ? (
                     <TableCell>
-                      {movement.type !== "reversal" && !movement.reversedBy ? (
+                      {/* Transfers are undone by cancelling them under Transfers. */}
+                      {movement.type !== "reversal" && movement.type !== "transferred" && !movement.reversedBy ? (
                         <MovementMenu movementId={movement.id} summary={summary} />
                       ) : null}
                     </TableCell>

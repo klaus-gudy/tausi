@@ -38,8 +38,8 @@ ALTER TABLE "warehouses" ADD CONSTRAINT "warehouses_organization_id_fkey" FOREIG
 ALTER TABLE "warehouses" ADD CONSTRAINT "warehouses_organization_id_region_key_fkey" FOREIGN KEY ("organization_id", "region_key") REFERENCES "regions"("organization_id", "key") ON DELETE NO ACTION ON UPDATE CASCADE;
 ALTER TABLE "warehouses" ADD CONSTRAINT "warehouses_organization_id_region_key_district_key_fkey" FOREIGN KEY ("organization_id", "region_key", "district_key") REFERENCES "districts"("organization_id", "region_key", "key") ON DELETE NO ACTION ON UPDATE CASCADE;
 
--- Seed: warehouse permissions. Owners and admins manage them; members and
--- viewers only look.
+-- Seed: warehouse permissions. Owners and admins manage them; members,
+-- viewers and storekeepers only look.
 INSERT INTO "permissions" ("key", "description") VALUES
     ('warehouses.read',   'See warehouses'),
     ('warehouses.manage', 'Add, edit and deactivate warehouses');
@@ -49,6 +49,6 @@ SELECT r."id", p."key"
 FROM "roles" r
 JOIN "permissions" p ON p."key" IN ('warehouses.read', 'warehouses.manage') AND (
     r."key" IN ('owner', 'admin')
-    OR (r."key" IN ('member', 'viewer') AND p."key" = 'warehouses.read')
+    OR (r."key" IN ('member', 'viewer', 'storekeeper') AND p."key" = 'warehouses.read')
 )
 WHERE r."organization_id" IS NULL;

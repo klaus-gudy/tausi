@@ -1,13 +1,15 @@
 -- Places become each organization's own: a new organization can start from
 -- Tanzania's list (lib/tanzania-places.ts) and change it without touching
 -- anyone else's. Every existing organization gets a copy of the shared list,
--- so its dealers keep their region and district.
+-- so its dealers keep their region and district and its salespeople their
+-- zone.
 
 -- DropForeignKey
 ALTER TABLE "super_dealers" DROP CONSTRAINT "super_dealers_region_key_fkey";
 ALTER TABLE "super_dealers" DROP CONSTRAINT "super_dealers_region_key_district_key_fkey";
 ALTER TABLE "regions" DROP CONSTRAINT "regions_zone_key_fkey";
 ALTER TABLE "districts" DROP CONSTRAINT "districts_region_key_fkey";
+ALTER TABLE "salespeople" DROP CONSTRAINT "salespeople_zone_key_fkey";
 
 -- DropIndex
 DROP INDEX "super_dealers_region_key_idx";
@@ -63,3 +65,7 @@ ALTER TABLE "districts" ADD CONSTRAINT "districts_organization_id_region_key_fke
 -- SIMPLE a dealer without a region or district isn't checked.
 ALTER TABLE "super_dealers" ADD CONSTRAINT "super_dealers_organization_id_region_key_fkey" FOREIGN KEY ("organization_id", "region_key") REFERENCES "regions"("organization_id", "key") ON DELETE NO ACTION ON UPDATE CASCADE;
 ALTER TABLE "super_dealers" ADD CONSTRAINT "super_dealers_organization_id_region_key_district_key_fkey" FOREIGN KEY ("organization_id", "region_key", "district_key") REFERENCES "districts"("organization_id", "region_key", "key") ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- Likewise a salesperson's zone.
+CREATE INDEX "salespeople_organization_id_zone_key_idx" ON "salespeople"("organization_id", "zone_key");
+ALTER TABLE "salespeople" ADD CONSTRAINT "salespeople_organization_id_zone_key_fkey" FOREIGN KEY ("organization_id", "zone_key") REFERENCES "zones"("organization_id", "key") ON DELETE NO ACTION ON UPDATE CASCADE;

@@ -1,4 +1,5 @@
 import { Prisma } from "@/lib/generated/prisma/client"
+import { formatCount } from "@/lib/format"
 import { readActiveMember } from "@/lib/membership"
 import { getPrisma } from "@/lib/prisma"
 
@@ -20,6 +21,52 @@ export async function memberWith(permission: string) {
 export function readText(value: FormDataEntryValue | null, max = 200) {
   const text = String(value ?? "").trim()
   return text ? text.slice(0, max) : null
+}
+
+const MAX_LINES = 50
+
+export type Line = { productId: string; quantity: number; unitCost: number | null }
+
+/**
+ * The product lines of a receive, issue or transfer form (parallel productId,
+ * quantity and, with `withCost`, unitCost fields), or a message saying what's
+ * wrong.
+ */
+export function readLines(formData: FormData, withCost: boolean): Line[] | string {
+  const productIds = formData.getAll("productId").map(String)
+  const quantities = formData.getAll("quantity")
+  const unitCosts = formData.getAll("unitCost")
+  const lines: Line[] = []
+  for (const [index, productId] of productIds.entries()) {
+    const quantityText = readText(quantities[index] ?? null)
+    // A row left completely empty is ignored.
+    if (!productId && !quantityText) continue
+    const row = productIds.length > 1 ? ` on line ${index + 1}` : ""
+    if (!isUuid(productId)) return `Pick a product${row}.`
+    const quantity = readWholeNumber(quantityText)
+    if (!quantity) return `Enter a quantity of at least 1${row}.`
+    const costText = withCost ? readText(unitCosts[index] ?? null) : null
+    const unitCost = costText === null ? null : readWholeNumber(costText)
+    if (costText !== null && unitCost === null) return `Enter the unit cost as a whole number${row}.`
+    lines.push({ productId, quantity, unitCost })
+  }
+  if (!lines.length) return "Add at least one product."
+  if (lines.length > MAX_LINES) return `Record at most ${MAX_LINES} products at a time.`
+  return lines
+}
+
+/** Quantities per product id, with the same product on two lines added up. */
+export function sumLines(lines: Line[]) {
+  const wanted = new Map<string, number>()
+  for (const line of lines) {
+    wanted.set(line.productId, (wanted.get(line.productId) ?? 0) + line.quantity)
+  }
+  return wanted
+}
+
+/** "1 unit", "12 units". */
+export function plural(count: number, word: string) {
+  return `${formatCount(count)} ${word}${count === 1 ? "" : "s"}`
 }
 
 /** A whole number from 0 to 1,000,000,000, or null when empty or not one. */
