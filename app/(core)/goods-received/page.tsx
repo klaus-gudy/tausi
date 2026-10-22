@@ -26,7 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatDay } from "@/lib/format";
-import { receivingWarehouses, stockOnHand } from "@/lib/inventory";
+import { activeWarehouses, stockOnHand } from "@/lib/inventory";
 import { shownCount } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -97,7 +97,7 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
           select: { id: true, name: true, code: true, size: true },
         })
       : [],
-    canReceive ? receivingWarehouses(organizationId) : [],
+    canReceive ? activeWarehouses(organizationId) : [],
     canReceive ? stockOnHand(organizationId) : new Map<string, number>(),
   ]);
 
