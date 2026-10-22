@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { normalizePhone } from "@/lib/dealers";
 import {
   isUniqueViolation,
+  isUuid,
   memberWith,
   notAllowed,
   readText,
@@ -17,6 +18,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function revalidateSalespeople() {
   revalidatePath("/salespeople");
   revalidatePath("/transfers");
+  revalidatePath("/deliveries");
 }
 
 /** Adds a salesperson, or edits one when the form carries its id. */
@@ -33,6 +35,7 @@ export async function saveSalesperson(
   const phone = typedPhone ? normalizePhone(typedPhone) : null;
   const email = readText(formData.get("email"))?.toLowerCase() ?? null;
   const zoneKey = readText(formData.get("zoneKey"), 100);
+  const userId = readText(formData.get("userId"), 100);
   if (!name) return { message: "Enter the salesperson's name." };
   if (typedPhone && !phone) return { message: "Enter a phone number like 0754 123 456, or leave it empty." };
   if (email && !EMAIL.test(email)) return { message: "Enter a valid email address, or leave it empty." };
@@ -42,8 +45,25 @@ export async function saveSalesperson(
     return { message: "Pick the zone from the list." };
   }
 
-  const data = { name, phone, email, zoneKey, notes: readText(formData.get("notes"), 1000) };
   const organizationId = member.organization.id;
+  // The login must belong to an active member, and to no other salesperson.
+  if (userId) {
+    if (!isUuid(userId)) return { message: "Pick the login from the list of members." };
+    const [membership, linked] = await Promise.all([
+      prisma.membership.findFirst({
+        where: { organizationId, userId, status: "active" },
+        select: { id: true },
+      }),
+      prisma.salesperson.findFirst({
+        where: { organizationId, userId, ...(id ? { id: { not: id } } : {}) },
+        select: { name: true },
+      }),
+    ]);
+    if (!membership) return { message: "Pick the login from the list of members." };
+    if (linked) return { message: `That login is already linked to ${linked.name}.` };
+  }
+
+  const data = { name, phone, email, zoneKey, userId, notes: readText(formData.get("notes"), 1000) };
   try {
     if (id) {
       const { count } = await prisma.salesperson.updateMany({ where: { id, organizationId }, data });
@@ -52,7 +72,8 @@ export async function saveSalesperson(
       await prisma.salesperson.create({ data: { ...data, organizationId } });
     }
   } catch (error) {
-    if (isUniqueViolation(error)) return { message: `There's already a salesperson called ${name}.` };
+    // The login was checked above, so a clash here is almost always the name.
+    if (isUniqueViolation(error)) return { message: `There's already a salesperson called ${name}, or that login is taken.` };
     throw error;
   }
 
