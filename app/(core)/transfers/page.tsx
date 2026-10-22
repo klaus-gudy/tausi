@@ -29,7 +29,7 @@ import {
 import { TabsContent } from "@/components/ui/tabs";
 import type { StockTransferStatus } from "@/lib/generated/prisma/client";
 import { formatCount, formatDate, formatDay } from "@/lib/format";
-import { stockOnHand } from "@/lib/inventory";
+import { activeWarehouses, stockByWarehouse } from "@/lib/inventory";
 import { shownCount } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -85,7 +85,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [counts, transfers, products, onHand, salespeople] = await Promise.all([
+  const [counts, transfers, products, warehouses, stock, salespeople] = await Promise.all([
     prisma.stockTransfer.groupBy({
       by: ["status"],
       where: { organizationId },
@@ -109,6 +109,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
         cancelledAt: true,
         acknowledgedAt: true,
         salesperson: { select: { name: true, zone: { select: { name: true } } } },
+        warehouse: { select: { name: true } },
         createdBy: { select: { name: true, email: true } },
         dispatchedBy: { select: { name: true, email: true } },
         arrivedBy: { select: { name: true, email: true } },
@@ -125,10 +126,11 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
       ? prisma.product.findMany({
           where: { organizationId, archivedAt: null },
           orderBy: { name: "asc" },
-          select: { id: true, name: true, code: true },
+          select: { id: true, name: true, code: true, size: true },
         })
       : [],
-    canTransfer ? stockOnHand(organizationId) : new Map<string, number>(),
+    canTransfer ? activeWarehouses(organizationId) : [],
+    canTransfer ? stockByWarehouse(organizationId) : {},
     canTransfer
       ? prisma.salesperson.findMany({
           where: { organizationId, deactivatedAt: null },
@@ -156,10 +158,9 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
           ? {
               open: (
                 <InitiateTransferDialog
-                  products={products.map((product) => ({
-                    ...product,
-                    onHand: onHand.get(product.id) ?? 0,
-                  }))}
+                  products={products.map((product) => ({ ...product, onHand: 0 }))}
+                  warehouses={warehouses}
+                  stock={stock}
                   salespeople={salespeople.map((salesperson) => ({
                     id: salesperson.id,
                     name: salesperson.name,
@@ -202,6 +203,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                             {formatDay(transfer.initiatedOn)}
                             {transfer.reference ? ` · ${transfer.reference}` : ""}
                           </div>
+                          <div className="text-xs text-muted-foreground">From {transfer.warehouse.name}</div>
                         </TableCell>
                         <TableCell>
                           <div>{transfer.salesperson.name}</div>
