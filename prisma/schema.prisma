@@ -50,6 +50,7 @@ model User {
   transfersAcknowledged StockTransfer[]     @relation("TransferAcknowledgedBy")
   salespeople           Salesperson[]
   deliveriesRecorded    Delivery[]
+  dealersOnboarded      SuperDealer[]
   productsCreated       Product[]           @relation("ProductCreatedBy")
   productsUpdated       Product[]           @relation("ProductUpdatedBy")
 
@@ -305,29 +306,46 @@ model Product {
 
 // The shops and distributors stock is issued to: where it leaves the store.
 // Every field is optional, but a dealer needs a shop name or a contact name,
-// and a phone or an email (checked in the database too).
+// and a phone or an email (checked in the database too). Dealers don't sign
+// in: a salesperson onboards them in person and they sign on the salesperson's
+// screen.
 model SuperDealer {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
   // Unique among the organization's dealers, ignoring case.
-  shopName       String?   @map("shop_name") @db.Citext
-  contactName    String?   @map("contact_name")
+  shopName        String?   @map("shop_name") @db.Citext
+  contactName     String?   @map("contact_name")
   // Stored as +255754123456; see lib/dealers.ts.
-  phone          String?
-  email          String?   @db.Citext
+  phone           String?
+  email           String?   @db.Citext
   // The zone comes from the region.
-  regionKey      String?   @map("region_key")
+  regionKey       String?   @map("region_key")
   // Must be in the region.
-  districtKey    String?   @map("district_key")
+  districtKey     String?   @map("district_key")
   // Street, area or landmark within the district.
-  address        String?
-  notes          String?
+  address         String?
+  // Where the shop is, from the salesperson's phone when onboarding.
+  latitude        Float?    @db.DoublePrecision
+  longitude       Float?    @db.DoublePrecision
+  // Taxpayer Identification Number from TRA, stored as 123-456-789.
+  tin             String?
+  // Business licence number as printed on the licence.
+  businessLicence String?   @map("business_licence")
+  notes           String?
+  // The dealer's signature as a PNG, the name they signed under and when.
+  // All three or none.
+  signature       Bytes?
+  signedByName    String?   @map("signed_by_name")
+  signedAt        DateTime? @map("signed_at") @db.Timestamptz
+  // Who onboarded the dealer in the field; empty for dealers added in the office.
+  onboardedById   String?   @map("onboarded_by_id") @db.Uuid
   // Inactive dealers keep their history but can't be issued stock.
-  deactivatedAt  DateTime? @map("deactivated_at") @db.Timestamptz
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deactivatedAt   DateTime? @map("deactivated_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  onboardedBy    User?           @relation(fields: [onboardedById], references: [id], onDelete: SetNull)
   region         Region?         @relation(fields: [regionKey], references: [key], onDelete: Restrict)
   district       District?       @relation(fields: [regionKey, districtKey], references: [regionKey, key], onDelete: Restrict)
   stockMovements StockMovement[]
