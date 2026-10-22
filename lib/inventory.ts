@@ -71,6 +71,25 @@ export async function defaultWarehouse(
   })
 }
 
+/**
+ * Stock on hand per warehouse id, then per product id, for forms that show
+ * what's in the warehouse picked. Missing entries are 0.
+ */
+export async function stockByWarehouse(organizationId: string) {
+  const sums = await getPrisma().stockMovement.groupBy({
+    by: ["warehouseId", "productId"],
+    where: { organizationId, holder: "warehouse" },
+    _sum: { quantity: true },
+  })
+  const stock: Record<string, Record<string, number>> = {}
+  for (const row of sums) {
+    if (!row.warehouseId) continue
+    stock[row.warehouseId] ??= {}
+    stock[row.warehouseId][row.productId] = row._sum.quantity ?? 0
+  }
+  return stock
+}
+
 /** Active warehouses stock can be received into, the default one first. */
 export async function receivingWarehouses(organizationId: string) {
   return getPrisma().warehouse.findMany({
