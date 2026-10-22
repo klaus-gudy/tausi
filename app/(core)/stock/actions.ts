@@ -8,9 +8,12 @@ import {
   lockProducts,
   memberWith,
   notAllowed,
+  plural,
   readDay,
+  readLines,
   readText,
   readWholeNumber,
+  sumLines,
   type ActionResult,
 } from "@/lib/inventory";
 import { dealerName } from "@/lib/dealers";
@@ -21,42 +24,11 @@ import { getPrisma } from "@/lib/prisma";
 // deletes one. Anything that removes stock locks the products first and
 // checks there is enough, so concurrent issues can't take stock below zero.
 
-const MAX_LINES = 50;
-
-type Line = { productId: string; quantity: number; unitCost: number | null };
-
-/** The product lines of a receive or issue form, or a message saying what's wrong. */
-function readLines(formData: FormData, withCost: boolean): Line[] | string {
-  const productIds = formData.getAll("productId").map(String);
-  const quantities = formData.getAll("quantity");
-  const unitCosts = formData.getAll("unitCost");
-  const lines: Line[] = [];
-  for (const [index, productId] of productIds.entries()) {
-    const quantityText = readText(quantities[index] ?? null);
-    // A row left completely empty is ignored.
-    if (!productId && !quantityText) continue;
-    const row = productIds.length > 1 ? ` on line ${index + 1}` : "";
-    if (!isUuid(productId)) return `Pick a product${row}.`;
-    const quantity = readWholeNumber(quantityText);
-    if (!quantity) return `Enter a quantity of at least 1${row}.`;
-    const costText = withCost ? readText(unitCosts[index] ?? null) : null;
-    const unitCost = costText === null ? null : readWholeNumber(costText);
-    if (costText !== null && unitCost === null) return `Enter the unit cost as a whole number${row}.`;
-    lines.push({ productId, quantity, unitCost });
-  }
-  if (!lines.length) return "Add at least one product.";
-  if (lines.length > MAX_LINES) return `Record at most ${MAX_LINES} products at a time.`;
-  return lines;
-}
-
 function revalidateInventory() {
   revalidatePath("/stock");
   revalidatePath("/products");
   revalidatePath("/super-dealers");
-}
-
-function plural(count: number, word: string) {
-  return `${formatCount(count)} ${word}${count === 1 ? "" : "s"}`;
+  revalidatePath("/transfers");
 }
 
 /** Records stock that arrived from a supplier. */
@@ -119,10 +91,7 @@ export async function issueStock(
   if (typeof lines === "string") return { message: lines };
 
   // The same product twice is one line with both quantities.
-  const wanted = new Map<string, number>();
-  for (const line of lines) {
-    wanted.set(line.productId, (wanted.get(line.productId) ?? 0) + line.quantity);
-  }
+  const wanted = sumLines(lines);
 
   const organizationId = member.organization.id;
   const result = await getPrisma().$transaction(async (tx): Promise<ActionResult> => {
@@ -237,6 +206,8 @@ export async function reverseMovement(movementId: string): Promise<ActionResult>
       });
       if (!movement) return { message: "That movement no longer exists." };
       if (movement.type === "reversal") return { message: "A reversal can't be reversed." };
+      // Its transfer tracks where the stock is, so only cancelling the transfer undoes it.
+      if (movement.type === "transferred") return { message: "Cancel its transfer under Transfers instead." };
       if (movement.reversedBy) return { message: "That movement was already reversed." };
 
       const [product] = await lockProducts(tx, organizationId, [movement.productId]);
