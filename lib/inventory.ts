@@ -57,21 +57,6 @@ export async function stockOnHand(
 }
 
 /**
- * The warehouse the stock page records against until it lets you pick one:
- * the organization's first active warehouse, or null when it has none.
- */
-export async function defaultWarehouse(
-  organizationId: string,
-  client: Prisma.TransactionClient = getPrisma()
-) {
-  return client.warehouse.findFirst({
-    where: { organizationId, deactivatedAt: null },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, name: true },
-  })
-}
-
-/**
  * Stock on hand per warehouse id, then per product id, for forms that show
  * what's in the warehouse picked. Missing entries are 0.
  */
@@ -118,8 +103,6 @@ export async function receivingWarehouses(organizationId: string) {
     select: { id: true, name: true },
   })
 }
-
-export const noWarehouse: ActionResult = { message: "Add a warehouse under Warehouses first." }
 
 /**
  * Locks the organization's products with these ids, in a fixed order so two
