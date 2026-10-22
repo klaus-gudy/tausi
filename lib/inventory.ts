@@ -95,8 +95,8 @@ export async function pickedWarehouse(
   return { id: warehouse.id, name: warehouse.name }
 }
 
-/** Active warehouses stock can be received into, the default one first. */
-export async function receivingWarehouses(organizationId: string) {
+/** Active warehouses stock forms can pick, oldest first. */
+export async function activeWarehouses(organizationId: string) {
   return getPrisma().warehouse.findMany({
     where: { organizationId, deactivatedAt: null },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
