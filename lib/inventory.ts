@@ -90,6 +90,26 @@ export async function stockByWarehouse(organizationId: string) {
   return stock
 }
 
+/**
+ * The active warehouse a stock form picked, or a message saying what's wrong
+ * with the pick.
+ */
+export async function pickedWarehouse(
+  organizationId: string,
+  value: FormDataEntryValue | null,
+  client: Prisma.TransactionClient = getPrisma()
+): Promise<{ id: string; name: string } | ActionResult> {
+  const id = String(value ?? "")
+  if (!isUuid(id)) return { message: "Pick a warehouse." }
+  const warehouse = await client.warehouse.findFirst({
+    where: { id, organizationId },
+    select: { id: true, name: true, deactivatedAt: true },
+  })
+  if (!warehouse) return { message: "That warehouse no longer exists." }
+  if (warehouse.deactivatedAt) return { message: `${warehouse.name} is inactive. Reactivate it first.` }
+  return { id: warehouse.id, name: warehouse.name }
+}
+
 /** Active warehouses stock can be received into, the default one first. */
 export async function receivingWarehouses(organizationId: string) {
   return getPrisma().warehouse.findMany({
