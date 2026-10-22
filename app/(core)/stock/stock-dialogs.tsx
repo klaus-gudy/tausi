@@ -227,17 +227,17 @@ export function ProductLines({
 }
 
 /** Units on hand in a warehouse, all products together. */
-function unitsIn(stock: StockLevels, warehouseId: string) {
+export function unitsIn(stock: StockLevels, warehouseId: string) {
   return Object.values(stock[warehouseId] ?? {}).reduce((sum, quantity) => sum + quantity, 0);
 }
 
 /** The products with what's on hand in `warehouseId`. */
-function productsIn(products: StockProduct[], stock: StockLevels, warehouseId: string) {
+export function productsIn(products: StockProduct[], stock: StockLevels, warehouseId: string) {
   return products.map((product) => ({ ...product, onHand: stock[warehouseId]?.[product.id] ?? 0 }));
 }
 
 /** A stock form's warehouse picker; submits warehouseId. Shows units on hand when given `stock`. */
-function WarehouseField({
+export function WarehouseField({
   id,
   warehouses,
   value,
