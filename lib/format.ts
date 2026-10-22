@@ -22,3 +22,18 @@ export function formatDay(value: Date) {
 export function formatSigned(value: number) {
   return `${value > 0 ? "+" : value < 0 ? "−" : ""}${count.format(Math.abs(value))}`
 }
+
+const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 })
+
+/** 1,284 / 12.9K / 4.2M, for headline figures and axis ticks. */
+export function formatCompact(value: number) {
+  return Math.abs(value) < 10_000 ? count.format(value) : compact.format(value)
+}
+
+/**
+ * An amount in Tanzanian shillings, the currency prices are kept in: "TSh 6,500",
+ * or "TSh 4.2M" with `short`.
+ */
+export function formatMoney(value: number, short = false) {
+  return `TSh ${short ? formatCompact(value) : count.format(value)}`
+}
