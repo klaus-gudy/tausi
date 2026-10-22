@@ -4,13 +4,12 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import {
-  defaultWarehouse,
   isUniqueViolation,
   isUuid,
   lockProducts,
   memberWith,
-  noWarehouse,
   notAllowed,
+  pickedWarehouse,
   readDay,
   readText,
   readWholeNumber,
@@ -23,8 +22,8 @@ import { getPrisma } from "@/lib/prisma";
 // Every change to stock is a new stock_movements row; nothing here edits or
 // deletes one. Anything that removes stock locks the products first and
 // checks there is enough, so concurrent issues can't take stock below zero.
-// Receipts go to the warehouse picked on the form; issues and counts still use
-// the organization's first warehouse until those forms let you pick one.
+// Each form picks the warehouse the stock is received into, issued from or
+// counted in.
 
 const MAX_LINES = 50;
 
@@ -80,19 +79,8 @@ export async function receiveStock(
 
   const organizationId = member.organization.id;
   const prisma = getPrisma();
-  const warehouseId = String(formData.get("warehouseId") ?? "");
-  const warehouse = warehouseId
-    ? isUuid(warehouseId)
-      ? await prisma.warehouse.findFirst({
-          where: { id: warehouseId, organizationId },
-          select: { id: true, name: true, deactivatedAt: true },
-        })
-      : null
-    : await defaultWarehouse(organizationId);
-  if (!warehouse) return warehouseId ? { message: "That warehouse no longer exists." } : noWarehouse;
-  if ("deactivatedAt" in warehouse && warehouse.deactivatedAt) {
-    return { message: `${warehouse.name} is inactive. Reactivate it first.` };
-  }
+  const warehouse = await pickedWarehouse(organizationId, formData.get("warehouseId"));
+  if ("message" in warehouse) return warehouse;
   const products = await prisma.product.findMany({
     where: { organizationId, id: { in: lines.map((line) => line.productId) } },
     select: { id: true, name: true, archivedAt: true },
@@ -167,8 +155,8 @@ export async function issueStock(
     });
     if (!dealer) return { message: "That dealer no longer exists." };
     if (dealer.deactivatedAt) return { message: `${dealerName(dealer)} is inactive. Reactivate them first.` };
-    const warehouse = await defaultWarehouse(organizationId, tx);
-    if (!warehouse) return noWarehouse;
+    const warehouse = await pickedWarehouse(organizationId, formData.get("warehouseId"), tx);
+    if ("message" in warehouse) return warehouse;
 
     const products = await lockProducts(tx, organizationId, warehouse.id, [...wanted.keys()]);
     if (products.length !== wanted.size) return { message: "One of those products no longer exists." };
@@ -204,7 +192,10 @@ export async function issueStock(
       }),
     });
     const units = [...wanted.values()].reduce((sum, quantity) => sum + quantity, 0);
-    return { success: true, message: `Issued ${plural(units, "unit")} to ${dealerName(dealer)}.` };
+    return {
+      success: true,
+      message: `Issued ${plural(units, "unit")} from ${warehouse.name} to ${dealerName(dealer)}.`,
+    };
   });
 
   if (result.success) revalidateInventory();
@@ -233,12 +224,14 @@ export async function adjustStock(
 
   const organizationId = member.organization.id;
   const result = await getPrisma().$transaction(async (tx): Promise<ActionResult> => {
-    const warehouse = await defaultWarehouse(organizationId, tx);
-    if (!warehouse) return noWarehouse;
+    const warehouse = await pickedWarehouse(organizationId, formData.get("warehouseId"), tx);
+    if ("message" in warehouse) return warehouse;
     const [product] = await lockProducts(tx, organizationId, warehouse.id, [productId]);
     if (!product) return { message: "That product no longer exists." };
     const difference = counted - product.onHand;
-    if (!difference) return { message: `${product.name} already has ${formatCount(counted)} on hand.` };
+    if (!difference) {
+      return { message: `${product.name} already has ${formatCount(counted)} on hand in ${warehouse.name}.` };
+    }
 
     await tx.stockMovement.create({
       data: {
@@ -255,7 +248,7 @@ export async function adjustStock(
     });
     return {
       success: true,
-      message: `${product.name} set to ${formatCount(counted)} (${difference > 0 ? "+" : "−"}${formatCount(Math.abs(difference))}).`,
+      message: `${product.name} in ${warehouse.name} set to ${formatCount(counted)} (${difference > 0 ? "+" : "−"}${formatCount(Math.abs(difference))}).`,
     };
   });
 
