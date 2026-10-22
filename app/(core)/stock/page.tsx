@@ -30,7 +30,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import type { StockMovementType } from "@/lib/generated/prisma/client";
 import { byDealerName, dealerName } from "@/lib/dealers";
 import { formatCount, formatDay, formatSigned } from "@/lib/format";
-import { receivingWarehouses, stockOnHand } from "@/lib/inventory";
+import { activeWarehouses, stockByWarehouse } from "@/lib/inventory";
 import { shownCount } from "@/lib/list-size";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -70,7 +70,7 @@ export default function StockPage({ searchParams }: PageProps<"/stock">) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Stock in &amp; out</h1>
         <p className="text-muted-foreground">
-          Record stock received from suppliers and issued to super dealers.
+          Record stock received from suppliers and issued to super dealers, warehouse by warehouse.
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
@@ -92,13 +92,13 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
   const { permissions } = member;
 
   const prisma = getPrisma();
-  const [products, warehouses, dealers, onHand, movementCount] = await Promise.all([
+  const [products, warehouses, dealers, stock, movementCount] = await Promise.all([
     prisma.product.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, code: true, size: true },
     }),
-    permissions.has("stock.receive") ? receivingWarehouses(organizationId) : [],
+    activeWarehouses(organizationId),
     permissions.has("stock.issue")
       ? prisma.superDealer.findMany({
           where: { organizationId, deactivatedAt: null },
@@ -111,7 +111,7 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
           },
         })
       : [],
-    stockOnHand(organizationId),
+    stockByWarehouse(organizationId),
     prisma.stockMovement.count({ where: { organizationId, holder: "warehouse" } }),
   ]);
   // The dealer picker shows "Shop · District, Region".
@@ -122,20 +122,30 @@ async function Stock({ searchParams }: Pick<PageProps<"/stock">, "searchParams">
       ? [dealer.district?.name, dealer.region.name].filter(Boolean).join(", ")
       : null,
   }));
+  // On hand in all warehouses together; the issue and count forms show each.
   const stockProducts = products.map((product) => ({
     ...product,
-    onHand: onHand.get(product.id) ?? 0,
+    onHand: Object.values(stock).reduce((sum, inWarehouse) => sum + (inWarehouse[product.id] ?? 0), 0),
   }));
 
   return (
     <>
       {products.length ? (
         <div className="flex flex-wrap gap-2">
-          {permissions.has("stock.receive") ? <ReceiveStockDialog products={stockProducts} warehouses={warehouses} /> : null}
-          {permissions.has("stock.issue") ? (
-            <IssueStockDialog products={stockProducts} dealers={stockDealers} />
+          {permissions.has("stock.receive") ? (
+            <ReceiveStockDialog products={stockProducts} warehouses={warehouses} />
           ) : null}
-          {permissions.has("stock.adjust") ? <AdjustStockDialog products={stockProducts} /> : null}
+          {permissions.has("stock.issue") ? (
+            <IssueStockDialog
+              products={stockProducts}
+              dealers={stockDealers}
+              warehouses={warehouses}
+              stock={stock}
+            />
+          ) : null}
+          {permissions.has("stock.adjust") ? (
+            <AdjustStockDialog products={stockProducts} warehouses={warehouses} stock={stock} />
+          ) : null}
         </div>
       ) : null}
       <UrlTabs
