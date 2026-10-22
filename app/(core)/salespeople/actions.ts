@@ -41,11 +41,14 @@ export async function saveSalesperson(
   if (email && !EMAIL.test(email)) return { message: "Enter a valid email address, or leave it empty." };
 
   const prisma = getPrisma();
-  if (zoneKey && !(await prisma.zone.findUnique({ where: { key: zoneKey } }))) {
+  const organizationId = member.organization.id;
+  if (
+    zoneKey &&
+    !(await prisma.zone.findUnique({ where: { organizationId_key: { organizationId, key: zoneKey } } }))
+  ) {
     return { message: "Pick the zone from the list." };
   }
 
-  const organizationId = member.organization.id;
   // The login must belong to an active member, and to no other salesperson.
   if (userId) {
     if (!isUuid(userId)) return { message: "Pick the login from the list of members." };
