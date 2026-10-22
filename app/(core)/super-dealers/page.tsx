@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { Store } from "lucide-react";
+import Link from "next/link";
+import { PenLine, Store } from "lucide-react";
 
 import { AddDealerDialog } from "./dealer-dialog";
 import { DealerMenu } from "./dealer-menu";
 import { NoAccessState } from "@/components/no-access-state";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { UrlTabs } from "@/components/url-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -62,6 +65,7 @@ async function SuperDealers({
 
   const tab = (await searchParams).tab === "inactive" ? "inactive" : "active";
   const canManage = member.permissions.has("dealers.manage");
+  const canOnboard = member.permissions.has("dealers.onboard");
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
@@ -78,6 +82,9 @@ async function SuperDealers({
         districtKey: true,
         address: true,
         notes: true,
+        tin: true,
+        businessLicence: true,
+        signedAt: true,
         region: { select: { name: true, zone: { select: { name: true } } } },
         district: { select: { name: true } },
       },
@@ -121,7 +128,18 @@ async function SuperDealers({
         { value: "active", label: "Active", count: activeCount },
         { value: "inactive", label: "Inactive", count: inactiveCount },
       ]}
-      actions={canManage ? { active: <AddDealerDialog places={places} /> } : undefined}
+      actions={
+        canManage || canOnboard
+          ? {
+              active: (
+                <div className="flex flex-wrap gap-2">
+                  {canOnboard ? <OnboardLink variant={canManage ? "outline" : "default"} /> : null}
+                  {canManage ? <AddDealerDialog places={places} /> : null}
+                </div>
+              ),
+            }
+          : undefined
+      }
     >
       <TabsContent value={tab}>
         {dealers.length ? (
@@ -145,11 +163,19 @@ async function SuperDealers({
                 <TableBody>
                   {dealers.map((dealer) => {
                     const last = lastIssued.get(dealer.id);
-                    const { region, district, ...editable } = dealer;
+                    const { region, district, signedAt, ...editable } = dealer;
                     return (
                       <TableRow key={dealer.id}>
                         <TableCell>
-                          <div className="font-medium">{dealerName(dealer)}</div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/super-dealers/${dealer.id}`}
+                              className="font-medium underline-offset-4 hover:underline"
+                            >
+                              {dealerName(dealer)}
+                            </Link>
+                            {signedAt ? <Badge variant="outline">Signed</Badge> : null}
+                          </div>
                           {dealer.address ? (
                             <div className="text-xs text-muted-foreground">{dealer.address}</div>
                           ) : null}
@@ -205,14 +231,27 @@ async function SuperDealers({
                   : "Add the shops and distributors you issue stock to."}
               </EmptyDescription>
             </EmptyHeader>
-            {tab === "active" && canManage ? (
-              <EmptyContent>
-                <AddDealerDialog places={places} />
+            {tab === "active" && (canManage || canOnboard) ? (
+              <EmptyContent className="flex-row justify-center">
+                {canOnboard ? <OnboardLink variant={canManage ? "outline" : "default"} /> : null}
+                {canManage ? <AddDealerDialog places={places} /> : null}
               </EmptyContent>
             ) : null}
           </Empty>
         )}
       </TabsContent>
     </UrlTabs>
+  );
+}
+
+/** Opens the field onboarding form, where the dealer signs. */
+function OnboardLink({ variant }: { variant: "default" | "outline" }) {
+  return (
+    <Button asChild variant={variant}>
+      <Link href="/super-dealers/onboard">
+        <PenLine data-icon="inline-start" />
+        Onboard dealer
+      </Link>
+    </Button>
   );
 }
