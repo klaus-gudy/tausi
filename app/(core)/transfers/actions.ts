@@ -10,6 +10,7 @@ import {
   lockProducts,
   memberWith,
   notAllowed,
+  pickedWarehouse,
   plural,
   readDay,
   readLines,
@@ -21,7 +22,7 @@ import { getPrisma } from "@/lib/prisma";
 import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
 
 // A transfer moves through initiated → in transit → arrived. Its stock comes
-// off hand when it is initiated; until it leaves, it can be cancelled, which
+// off the warehouse's stock on hand when it is initiated; until it leaves, it can be cancelled, which
 // reverses those movements and puts the stock back.
 
 function revalidateTransfers() {
@@ -31,7 +32,7 @@ function revalidateTransfers() {
   revalidatePath("/products");
 }
 
-/** Takes stock off hand for a salesperson and opens a transfer for it. */
+/** Takes stock off hand in a warehouse for a salesperson and opens a transfer for it. */
 export async function initiateTransfer(
   _previous: ActionResult,
   formData: FormData
@@ -61,14 +62,17 @@ export async function initiateTransfer(
         return { message: `${salesperson.name} is inactive. Reactivate them first.` };
       }
 
-      const products = await lockProducts(tx, organizationId, [...wanted.keys()]);
+      const warehouse = await pickedWarehouse(organizationId, formData.get("warehouseId"), tx);
+      if ("message" in warehouse) return warehouse;
+
+      const products = await lockProducts(tx, organizationId, warehouse.id, [...wanted.keys()]);
       if (products.length !== wanted.size) return { message: "One of those products no longer exists." };
       for (const product of products) {
         const quantity = wanted.get(product.id)!;
         if (product.archivedAt) return { message: `${product.name} is archived. Restore it first.` };
         if (quantity > product.onHand) {
           return {
-            message: `Only ${formatCount(product.onHand)} of ${product.name} on hand; you tried to send ${formatCount(quantity)}.`,
+            message: `Only ${formatCount(product.onHand)} of ${product.name} on hand in ${warehouse.name}; you tried to send ${formatCount(quantity)}.`,
           };
         }
       }
@@ -82,6 +86,7 @@ export async function initiateTransfer(
           organizationId,
           number,
           salespersonId,
+          warehouseId: warehouse.id,
           reference,
           note,
           initiatedOn,
@@ -91,6 +96,8 @@ export async function initiateTransfer(
               organizationId,
               productId,
               type: "transferred" as const,
+              holder: "warehouse" as const,
+              warehouseId: warehouse.id,
               quantity: -quantity,
               occurredOn: initiatedOn,
               reference,
@@ -193,7 +200,7 @@ export async function cancelTransfer(id: string) {
     async (tx, organizationId, userId) => {
       const movements = await tx.stockMovement.findMany({
         where: { transferId: id, organizationId, type: "transferred" },
-        select: { id: true, productId: true, quantity: true, reference: true },
+        select: { id: true, productId: true, quantity: true, warehouseId: true, reference: true },
       });
       const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
       await tx.stockMovement.createMany({
@@ -201,6 +208,8 @@ export async function cancelTransfer(id: string) {
           organizationId,
           productId: movement.productId,
           type: "reversal" as const,
+          holder: "warehouse" as const,
+          warehouseId: movement.warehouseId,
           quantity: -movement.quantity,
           transferId: id,
           reference: movement.reference,
