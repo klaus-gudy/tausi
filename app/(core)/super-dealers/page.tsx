@@ -65,7 +65,7 @@ async function SuperDealers({
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [dealers, activeCount, inactiveCount, issuedTotals, lastIssues, places] = await Promise.all([
+  const [dealers, activeCount, inactiveCount, issuedTotals, lastIssues, delivered, places] = await Promise.all([
     prisma.superDealer.findMany({
       where: { organizationId, deactivatedAt: tab === "inactive" ? { not: null } : null },
       select: {
@@ -95,11 +95,24 @@ async function SuperDealers({
       where: { organizationId, type: "issued" },
       _max: { occurredOn: true },
     }),
+    // What salespeople supplied each dealer, and when last.
+    prisma.$queryRaw<{ super_dealer_id: string; units: bigint; last: Date }[]>`
+      SELECT d.super_dealer_id, SUM(l.quantity) AS units, MAX(d.delivered_on) AS last
+      FROM deliveries d
+      JOIN delivery_lines l ON l.delivery_id = d.id
+      WHERE d.organization_id = ${organizationId}::uuid
+      GROUP BY d.super_dealer_id`,
     canManage ? readPlaces() : [],
   ]);
   dealers.sort(byDealerName);
   const issued = new Map(issuedTotals.map((row) => [row.superDealerId, 0 - (row._sum.quantity ?? 0)]));
   const lastIssued = new Map(lastIssues.map((row) => [row.superDealerId, row._max.occurredOn]));
+  // Stock reaches a dealer straight from the store or through a salesperson.
+  for (const row of delivered) {
+    issued.set(row.super_dealer_id, (issued.get(row.super_dealer_id) ?? 0) + Number(row.units));
+    const last = lastIssued.get(row.super_dealer_id);
+    if (!last || row.last > last) lastIssued.set(row.super_dealer_id, row.last);
+  }
 
   return (
     <UrlTabs
@@ -120,8 +133,8 @@ async function SuperDealers({
                     <TableHead>Dealer</TableHead>
                     <TableHead className="hidden md:table-cell">Contact</TableHead>
                     <TableHead className="hidden sm:table-cell">Location</TableHead>
-                    <TableHead className="text-right">Units issued</TableHead>
-                    <TableHead className="hidden text-right sm:table-cell">Last issue</TableHead>
+                    <TableHead className="text-right">Units supplied</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">Last supplied</TableHead>
                     {canManage ? (
                       <TableHead className="w-10">
                         <span className="sr-only">Actions</span>
