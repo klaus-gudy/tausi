@@ -43,6 +43,8 @@ export type StockProduct = {
   onHand: number;
 };
 export type StockWarehouse = { id: string; name: string };
+/** Stock on hand per warehouse id, then per product id; missing entries are 0. */
+export type StockLevels = Record<string, Record<string, number>>;
 export type StockDealer = { id: string; name: string; region: string | null };
 
 type Action = (previous: ActionResult, formData: FormData) => Promise<ActionResult>;
@@ -221,6 +223,55 @@ function ProductLines({
   );
 }
 
+/** Units on hand in a warehouse, all products together. */
+function unitsIn(stock: StockLevels, warehouseId: string) {
+  return Object.values(stock[warehouseId] ?? {}).reduce((sum, quantity) => sum + quantity, 0);
+}
+
+/** The products with what's on hand in `warehouseId`. */
+function productsIn(products: StockProduct[], stock: StockLevels, warehouseId: string) {
+  return products.map((product) => ({ ...product, onHand: stock[warehouseId]?.[product.id] ?? 0 }));
+}
+
+/** A stock form's warehouse picker; submits warehouseId. Shows units on hand when given `stock`. */
+function WarehouseField({
+  id,
+  warehouses,
+  value,
+  onChange,
+  stock,
+}: {
+  id: string;
+  warehouses: StockWarehouse[];
+  value: string;
+  onChange: (warehouseId: string) => void;
+  stock?: StockLevels;
+}) {
+  if (!warehouses.length) {
+    return <FieldDescription>Add a warehouse under Warehouses first.</FieldDescription>;
+  }
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>Warehouse</FieldLabel>
+      <NativeSelect
+        id={id}
+        name="warehouseId"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full"
+        required
+      >
+        {warehouses.map((warehouse) => (
+          <NativeSelectOption key={warehouse.id} value={warehouse.id}>
+            {warehouse.name}
+            {stock ? ` · ${formatCount(unitsIn(stock, warehouse.id))} units on hand` : ""}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+    </Field>
+  );
+}
+
 export function ReceiveStockDialog({
   products,
   warehouses,
@@ -245,6 +296,7 @@ function ReceiveForm({
   onDone: () => void;
 }) {
   const [state, onSubmit, pending] = useDialogAction(receiveStock, onDone);
+  const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
   const day = today();
 
   return (
@@ -254,26 +306,12 @@ function ReceiveForm({
         <DialogDescription>Record what arrived from a supplier. It adds to stock on hand.</DialogDescription>
       </DialogHeader>
       <FieldGroup className="py-4">
-        {warehouses.length ? (
-          <Field>
-            <FieldLabel htmlFor="receive-warehouse">Warehouse</FieldLabel>
-            <NativeSelect
-              id="receive-warehouse"
-              name="warehouseId"
-              defaultValue={warehouses[0].id}
-              className="w-full"
-              required
-            >
-              {warehouses.map((warehouse) => (
-                <NativeSelectOption key={warehouse.id} value={warehouse.id}>
-                  {warehouse.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
-        ) : (
-          <FieldDescription>Add a warehouse under Warehouses before receiving stock.</FieldDescription>
-        )}
+        <WarehouseField
+          id="receive-warehouse"
+          warehouses={warehouses}
+          value={warehouseId}
+          onChange={setWarehouseId}
+        />
         <div className="grid gap-5 sm:grid-cols-3">
           <Field>
             <FieldLabel htmlFor="receive-supplier">Supplier</FieldLabel>
@@ -296,7 +334,7 @@ function ReceiveForm({
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
-        <Button type="submit" disabled={pending || !warehouses.length}>
+        <Button type="submit" disabled={pending || !warehouseId}>
           {pending ? "Recording…" : "Record receipt"}
         </Button>
       </DialogFooter>
@@ -307,9 +345,13 @@ function ReceiveForm({
 export function IssueStockDialog({
   products,
   dealers,
+  warehouses,
+  stock,
 }: {
   products: StockProduct[];
   dealers: StockDealer[];
+  warehouses: StockWarehouse[];
+  stock: StockLevels;
 }) {
   return (
     <FormDialog
@@ -317,7 +359,15 @@ export function IssueStockDialog({
       variant="outline"
       icon={<PackageMinus data-icon="inline-start" />}
     >
-      {(close) => <IssueForm products={products} dealers={dealers} onDone={close} />}
+      {(close) => (
+        <IssueForm
+          products={products}
+          dealers={dealers}
+          warehouses={warehouses}
+          stock={stock}
+          onDone={close}
+        />
+      )}
     </FormDialog>
   );
 }
@@ -325,15 +375,24 @@ export function IssueStockDialog({
 function IssueForm({
   products,
   dealers,
+  warehouses,
+  stock,
   onDone,
 }: {
   products: StockProduct[];
   dealers: StockDealer[];
+  warehouses: StockWarehouse[];
+  stock: StockLevels;
   onDone: () => void;
 }) {
   const [state, onSubmit, pending] = useDialogAction(issueStock, onDone);
+  // Start from the first warehouse that has anything to issue.
+  const [warehouseId, setWarehouseId] = useState(
+    () => (warehouses.find((warehouse) => unitsIn(stock, warehouse.id) > 0) ?? warehouses[0])?.id ?? ""
+  );
+  const warehouse = warehouses.find((other) => other.id === warehouseId);
   const day = today();
-  const inStock = products.filter((product) => product.onHand > 0);
+  const inStock = productsIn(products, stock, warehouseId).filter((product) => product.onHand > 0);
 
   return (
     <form onSubmit={onSubmit}>
@@ -342,6 +401,13 @@ function IssueForm({
         <DialogDescription>Record stock leaving the store. It comes off stock on hand.</DialogDescription>
       </DialogHeader>
       <FieldGroup className="py-4">
+        <WarehouseField
+          id="issue-warehouse"
+          warehouses={warehouses}
+          value={warehouseId}
+          onChange={setWarehouseId}
+          stock={stock}
+        />
         <div className="grid gap-5 sm:grid-cols-3">
           <Field>
             <FieldLabel htmlFor="issue-dealer">Super dealer</FieldLabel>
@@ -373,10 +439,11 @@ function IssueForm({
           </Field>
         </div>
         {inStock.length ? (
-          <ProductLines products={inStock} withCost={false} showOnHand />
-        ) : (
-          <FieldDescription>Nothing is in stock. Receive stock first.</FieldDescription>
-        )}
+          // Lines picked from one warehouse don't carry over to another.
+          <ProductLines key={warehouseId} products={inStock} withCost={false} showOnHand />
+        ) : warehouse ? (
+          <FieldDescription>Nothing is in stock in {warehouse.name}. Receive stock first.</FieldDescription>
+        ) : null}
         <Field>
           <FieldLabel htmlFor="issue-note">Note</FieldLabel>
           <Textarea id="issue-note" name="note" maxLength={1000} rows={2} />
@@ -392,22 +459,44 @@ function IssueForm({
   );
 }
 
-export function AdjustStockDialog({ products }: { products: StockProduct[] }) {
+export function AdjustStockDialog({
+  products,
+  warehouses,
+  stock,
+}: {
+  products: StockProduct[];
+  warehouses: StockWarehouse[];
+  stock: StockLevels;
+}) {
   return (
     <FormDialog
       label="Stock count"
       variant="outline"
       icon={<ClipboardCheck data-icon="inline-start" />}
     >
-      {(close) => <AdjustForm products={products} onDone={close} />}
+      {(close) => (
+        <AdjustForm products={products} warehouses={warehouses} stock={stock} onDone={close} />
+      )}
     </FormDialog>
   );
 }
 
-function AdjustForm({ products, onDone }: { products: StockProduct[]; onDone: () => void }) {
+function AdjustForm({
+  products,
+  warehouses,
+  stock,
+  onDone,
+}: {
+  products: StockProduct[];
+  warehouses: StockWarehouse[];
+  stock: StockLevels;
+  onDone: () => void;
+}) {
   const [state, onSubmit, pending] = useDialogAction(adjustStock, onDone);
+  const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
   const [productId, setProductId] = useState("");
-  const product = products.find((other) => other.id === productId);
+  const warehouse = warehouses.find((other) => other.id === warehouseId);
+  const product = productsIn(products, stock, warehouseId).find((other) => other.id === productId);
   const day = today();
 
   return (
@@ -419,6 +508,12 @@ function AdjustForm({ products, onDone }: { products: StockProduct[]; onDone: ()
         </DialogDescription>
       </DialogHeader>
       <FieldGroup className="py-4">
+        <WarehouseField
+          id="adjust-warehouse"
+          warehouses={warehouses}
+          value={warehouseId}
+          onChange={setWarehouseId}
+        />
         <Field>
           <FieldLabel htmlFor="adjust-product">Product</FieldLabel>
           <NativeSelect
@@ -440,7 +535,8 @@ function AdjustForm({ products, onDone }: { products: StockProduct[]; onDone: ()
           </NativeSelect>
           {product ? (
             <FieldDescription>
-              The system shows {formatCount(product.onHand)} on hand.
+              The system shows {formatCount(product.onHand)} on hand
+              {warehouse ? ` in ${warehouse.name}` : ""}.
             </FieldDescription>
           ) : null}
         </Field>
@@ -476,7 +572,7 @@ function AdjustForm({ products, onDone }: { products: StockProduct[]; onDone: ()
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending || !warehouse}>
           {pending ? "Saving…" : "Save count"}
         </Button>
       </DialogFooter>
