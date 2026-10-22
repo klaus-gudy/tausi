@@ -8,6 +8,7 @@ import { setSalespersonActive } from "./actions";
 import {
   EditSalespersonDialog,
   type EditableSalesperson,
+  type LoginOption,
   type ZoneOption,
 } from "./salesperson-dialog";
 import { Button } from "@/components/ui/button";
@@ -21,10 +22,12 @@ import {
 export function SalespersonMenu({
   salesperson,
   zones,
+  logins,
   inactive,
 }: {
   salesperson: EditableSalesperson;
   zones: ZoneOption[];
+  logins: LoginOption[];
   inactive: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -62,6 +65,7 @@ export function SalespersonMenu({
       <EditSalespersonDialog
         salesperson={salesperson}
         zones={zones}
+        logins={logins}
         open={editing}
         onOpenChange={setEditing}
       />
