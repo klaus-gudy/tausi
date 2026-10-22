@@ -46,3 +46,12 @@ export type PlaceRegion = {
 }
 
 export type PlaceZone = { key: string; name: string; regions: PlaceRegion[] }
+
+/**
+ * A TRA Taxpayer Identification Number as stored: "123-456-789". It may be
+ * typed with or without dashes or spaces. Null when it isn't nine digits.
+ */
+export function normalizeTin(value: string) {
+  const digits = value.replace(/[\s-]/g, "")
+  return /^\d{9}$/.test(digits) ? `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}` : null
+}
