@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
 import { formatPhone } from "@/lib/dealers";
+import { heldStock } from "@/lib/deliveries";
 import { formatCount } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -41,7 +42,7 @@ export default function SalespeoplePage({ searchParams }: PageProps<"/salespeopl
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Salespeople</h1>
         <p className="text-muted-foreground">
-          Who covers which zone, and the stock sent to them.
+          Who covers which zone, the stock they hold and what they supplied.
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
@@ -64,7 +65,7 @@ async function Salespeople({
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [salespeople, activeCount, inactiveCount, sent, zones] = await Promise.all([
+  const [salespeople, activeCount, inactiveCount, onTheWay, held, supplied, zones, members] = await Promise.all([
     prisma.salesperson.findMany({
       where: { organizationId, deactivatedAt: tab === "inactive" ? { not: null } : null },
       orderBy: { name: "asc" },
@@ -74,25 +75,47 @@ async function Salespeople({
         phone: true,
         email: true,
         zoneKey: true,
+        userId: true,
         notes: true,
         zone: { select: { name: true } },
+        user: { select: { name: true, email: true } },
       },
     }),
     prisma.salesperson.count({ where: { organizationId, deactivatedAt: null } }),
     prisma.salesperson.count({ where: { organizationId, deactivatedAt: { not: null } } }),
-    // Units on the way to and delivered to each salesperson. Cancelled
-    // transfers are left out; their stock went back on hand.
-    prisma.$queryRaw<{ salesperson_id: string; status: "in_transit" | "arrived"; units: bigint }[]>`
-      SELECT t.salesperson_id, t.status, -SUM(m.quantity) AS units
+    // Units dispatched to each salesperson that they haven't acknowledged yet.
+    prisma.$queryRaw<{ salesperson_id: string; units: bigint }[]>`
+      SELECT t.salesperson_id, -SUM(m.quantity) AS units
       FROM stock_transfers t
-      JOIN stock_movements m ON m.transfer_id = t.id
+      JOIN stock_movements m ON m.transfer_id = t.id AND m.type = 'transferred'
       WHERE t.organization_id = ${organizationId}::uuid
         AND t.status IN ('in_transit', 'arrived')
-      GROUP BY t.salesperson_id, t.status`,
+        AND t.acknowledged_at IS NULL
+      GROUP BY t.salesperson_id`,
+    heldStock(organizationId),
+    prisma.$queryRaw<{ salesperson_id: string; units: bigint }[]>`
+      SELECT d.salesperson_id, SUM(l.quantity) AS units
+      FROM deliveries d
+      JOIN delivery_lines l ON l.delivery_id = d.id
+      WHERE d.organization_id = ${organizationId}::uuid
+      GROUP BY d.salesperson_id`,
     canManage ? prisma.zone.findMany({ orderBy: { position: "asc" }, select: { key: true, name: true } }) : [],
+    canManage
+      ? prisma.membership.findMany({
+          where: { organizationId, status: "active" },
+          orderBy: { user: { email: "asc" } },
+          select: { user: { select: { id: true, name: true, email: true } } },
+        })
+      : [],
   ]);
-  const units = (id: string, status: "in_transit" | "arrived") =>
-    Number(sent.find((row) => row.salesperson_id === id && row.status === status)?.units ?? 0);
+  const sum = (rows: { salesperson_id: string; units: bigint }[], id: string) =>
+    Number(rows.find((row) => row.salesperson_id === id)?.units ?? 0);
+  const holding = (id: string) =>
+    [...(held.get(id)?.values() ?? [])].reduce((total, units) => total + units, 0);
+  const logins = members.map(({ user }) => ({
+    userId: user.id,
+    label: user.name ? `${user.name} (${user.email})` : user.email,
+  }));
 
   return (
     <UrlTabs
@@ -101,7 +124,7 @@ async function Salespeople({
         { value: "active", label: "Active", count: activeCount },
         { value: "inactive", label: "Inactive", count: inactiveCount },
       ]}
-      actions={canManage ? { active: <AddSalespersonDialog zones={zones} /> } : undefined}
+      actions={canManage ? { active: <AddSalespersonDialog zones={zones} logins={logins} /> } : undefined}
     >
       <TabsContent value={tab}>
         {salespeople.length ? (
@@ -113,8 +136,9 @@ async function Salespeople({
                     <TableHead>Salesperson</TableHead>
                     <TableHead className="hidden md:table-cell">Contact</TableHead>
                     <TableHead className="hidden sm:table-cell">Zone</TableHead>
-                    <TableHead className="text-right">In transit</TableHead>
-                    <TableHead className="text-right">Delivered</TableHead>
+                    <TableHead className="hidden text-right lg:table-cell">On the way</TableHead>
+                    <TableHead className="text-right">Holding</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">Supplied</TableHead>
                     {canManage ? (
                       <TableHead className="w-10">
                         <span className="sr-only">Actions</span>
@@ -124,11 +148,14 @@ async function Salespeople({
                 </TableHeader>
                 <TableBody>
                   {salespeople.map((salesperson) => {
-                    const { zone, ...editable } = salesperson;
+                    const { zone, user, ...editable } = salesperson;
                     return (
                       <TableRow key={salesperson.id}>
                         <TableCell>
                           <div className="font-medium">{salesperson.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {user ? `Signs in as ${user.email}` : "No login"}
+                          </div>
                           {salesperson.notes ? (
                             <div className="max-w-xs truncate text-xs text-muted-foreground">
                               {salesperson.notes}
@@ -143,17 +170,21 @@ async function Salespeople({
                         <TableCell className="hidden text-muted-foreground sm:table-cell">
                           {zone?.name ?? "—"}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCount(units(salesperson.id, "in_transit"))}
+                        <TableCell className="hidden text-right tabular-nums lg:table-cell">
+                          {formatCount(sum(onTheWay, salesperson.id))}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCount(units(salesperson.id, "arrived"))}
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {formatCount(holding(salesperson.id))}
+                        </TableCell>
+                        <TableCell className="hidden text-right tabular-nums sm:table-cell">
+                          {formatCount(sum(supplied, salesperson.id))}
                         </TableCell>
                         {canManage ? (
                           <TableCell>
                             <SalespersonMenu
                               salesperson={editable}
                               zones={zones}
+                              logins={logins}
                               inactive={tab === "inactive"}
                             />
                           </TableCell>
@@ -182,7 +213,7 @@ async function Salespeople({
             </EmptyHeader>
             {tab === "active" && canManage ? (
               <EmptyContent>
-                <AddSalespersonDialog zones={zones} />
+                <AddSalespersonDialog zones={zones} logins={logins} />
               </EmptyContent>
             ) : null}
           </Empty>
