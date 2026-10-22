@@ -107,11 +107,13 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
         dispatchedAt: true,
         arrivedAt: true,
         cancelledAt: true,
+        acknowledgedAt: true,
         salesperson: { select: { name: true, zone: { select: { name: true } } } },
         createdBy: { select: { name: true, email: true } },
         dispatchedBy: { select: { name: true, email: true } },
         arrivedBy: { select: { name: true, email: true } },
         cancelledBy: { select: { name: true, email: true } },
+        acknowledgedBy: { select: { name: true, email: true } },
         movements: {
           where: { type: "transferred" },
           orderBy: { product: { name: "asc" } },
@@ -231,7 +233,9 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                         </TableCell>
                         <TableCell>
                           <Badge variant={STATUS_VARIANTS[transfer.status]}>
-                            {TRANSFER_STATUS_LABELS[transfer.status]}
+                            {transfer.acknowledgedAt
+                              ? "Acknowledged"
+                              : TRANSFER_STATUS_LABELS[transfer.status]}
                           </Badge>
                           <Steps transfer={transfer} />
                         </TableCell>
@@ -291,10 +295,12 @@ function Steps({
     dispatchedAt: Date | null;
     arrivedAt: Date | null;
     cancelledAt: Date | null;
+    acknowledgedAt: Date | null;
     createdBy: Person;
     dispatchedBy: Person;
     arrivedBy: Person;
     cancelledBy: Person;
+    acknowledgedBy: Person;
   };
 }) {
   const who = (person: Person) => (person ? ` by ${person.name || person.email}` : "");
@@ -302,6 +308,7 @@ function Steps({
     { label: "Initiated", at: transfer.createdAt, by: transfer.createdBy },
     { label: "Dispatched", at: transfer.dispatchedAt, by: transfer.dispatchedBy },
     { label: "Arrived", at: transfer.arrivedAt, by: transfer.arrivedBy },
+    { label: "Acknowledged", at: transfer.acknowledgedAt, by: transfer.acknowledgedBy },
     { label: "Cancelled", at: transfer.cancelledAt, by: transfer.cancelledBy },
   ];
   return (
