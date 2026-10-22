@@ -100,10 +100,13 @@ export function ProductLines({
   products,
   withCost,
   showOnHand,
+  onHandLabel = "on hand",
 }: {
   products: StockProduct[];
   withCost: boolean;
   showOnHand: boolean;
+  /** What the count next to each product is, e.g. "with you". */
+  onHandLabel?: string;
 }) {
   const nextKey = useRef(1);
   const [lines, setLines] = useState([0]);
@@ -134,7 +137,7 @@ export function ProductLines({
               {products.map((product) => (
                 <NativeSelectOption key={product.id} value={product.id}>
                   {product.name} ({product.code})
-                  {showOnHand ? ` · ${formatCount(product.onHand)} on hand` : ""}
+                  {showOnHand ? ` · ${formatCount(product.onHand)} ${onHandLabel}` : ""}
                 </NativeSelectOption>
               ))}
             </NativeSelect>
