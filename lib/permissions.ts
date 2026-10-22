@@ -42,6 +42,17 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     permissions: [
       { key: "dealers.read", label: "View super dealers" },
       { key: "dealers.manage", label: "Add, edit and deactivate super dealers" },
+      { key: "dealers.onboard", label: "Sign up new super dealers in person, with their signature" },
+    ],
+  },
+  {
+    key: "salespeople",
+    label: "Salespeople",
+    description: "The field staff stock is sent to.",
+    read: "salespeople.read",
+    permissions: [
+      { key: "salespeople.read", label: "View salespeople" },
+      { key: "salespeople.manage", label: "Add, edit and deactivate salespeople" },
     ],
   },
   {
@@ -53,7 +64,17 @@ export const PERMISSION_MODULES: PermissionModule[] = [
       { key: "stock.read", label: "View stock movements" },
       { key: "stock.receive", label: "Record stock received from suppliers" },
       { key: "stock.issue", label: "Record stock issued to super dealers" },
+      { key: "stock.transfer", label: "Send stock to salespeople and update it until it arrives" },
       { key: "stock.adjust", label: "Correct stock after a count and reverse movements" },
+    ],
+  },
+  {
+    key: "deliveries",
+    label: "Deliveries",
+    description: "Stock salespeople supply to super dealers.",
+    permissions: [
+      { key: "deliveries.read", label: "View every salesperson's deliveries" },
+      { key: "deliveries.record", label: "Acknowledge stock sent to you and supply it to super dealers" },
     ],
   },
   {
