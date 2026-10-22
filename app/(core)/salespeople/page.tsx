@@ -99,7 +99,11 @@ async function Salespeople({
       JOIN delivery_lines l ON l.delivery_id = d.id
       WHERE d.organization_id = ${organizationId}::uuid
       GROUP BY d.salesperson_id`,
-    canManage ? prisma.zone.findMany({ orderBy: { position: "asc" }, select: { key: true, name: true } }) : [],
+    canManage ? prisma.zone.findMany({
+          where: { organizationId },
+          orderBy: { position: "asc" },
+          select: { key: true, name: true },
+        }) : [],
     canManage
       ? prisma.membership.findMany({
           where: { organizationId, status: "active" },
