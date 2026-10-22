@@ -15,7 +15,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,15 +35,25 @@ export type EditableSalesperson = {
   phone: string | null;
   email: string | null;
   zoneKey: string | null;
+  userId: string | null;
   notes: string | null;
 };
 
 export type ZoneOption = { key: string; name: string };
 
+/** A member whose login a salesperson can be linked to. */
+export type LoginOption = { userId: string; label: string };
+
 const initialState: ActionResult = { message: "" };
 
 /** The "Add salesperson" button and its dialog. */
-export function AddSalespersonDialog({ zones }: { zones: ZoneOption[] }) {
+export function AddSalespersonDialog({
+  zones,
+  logins,
+}: {
+  zones: ZoneOption[];
+  logins: LoginOption[];
+}) {
   const [open, setOpen] = useState(false);
   // Remounting the form clears it for the next salesperson.
   const [formKey, setFormKey] = useState(0);
@@ -57,7 +73,7 @@ export function AddSalespersonDialog({ zones }: { zones: ZoneOption[] }) {
         </Button>
       </DialogTrigger>
       <DialogContent>
-        <SalespersonForm key={formKey} zones={zones} onSaved={() => setOpen(false)} />
+        <SalespersonForm key={formKey} zones={zones} logins={logins} onSaved={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );
@@ -67,11 +83,13 @@ export function AddSalespersonDialog({ zones }: { zones: ZoneOption[] }) {
 export function EditSalespersonDialog({
   salesperson,
   zones,
+  logins,
   open,
   onOpenChange,
 }: {
   salesperson: EditableSalesperson;
   zones: ZoneOption[];
+  logins: LoginOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -82,6 +100,7 @@ export function EditSalespersonDialog({
           <SalespersonForm
             salesperson={salesperson}
             zones={zones}
+            logins={logins}
             onSaved={() => onOpenChange(false)}
           />
         ) : null}
@@ -93,10 +112,12 @@ export function EditSalespersonDialog({
 function SalespersonForm({
   salesperson,
   zones,
+  logins,
   onSaved,
 }: {
   salesperson?: EditableSalesperson;
   zones: ZoneOption[];
+  logins: LoginOption[];
   onSaved: () => void;
 }) {
   const [state, onSubmit, pending] = useFormAction(
@@ -156,22 +177,43 @@ function SalespersonForm({
             />
           </Field>
         </div>
-        <Field>
-          <FieldLabel htmlFor="salesperson-zone">Zone</FieldLabel>
-          <NativeSelect
-            id="salesperson-zone"
-            name="zoneKey"
-            defaultValue={salesperson?.zoneKey ?? ""}
-            className="w-full"
-          >
-            <NativeSelectOption value="">No zone</NativeSelectOption>
-            {zones.map((zone) => (
-              <NativeSelectOption key={zone.key} value={zone.key}>
-                {zone.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="salesperson-zone">Zone</FieldLabel>
+            <NativeSelect
+              id="salesperson-zone"
+              name="zoneKey"
+              defaultValue={salesperson?.zoneKey ?? ""}
+              className="w-full"
+            >
+              <NativeSelectOption value="">No zone</NativeSelectOption>
+              {zones.map((zone) => (
+                <NativeSelectOption key={zone.key} value={zone.key}>
+                  {zone.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="salesperson-login">Login</FieldLabel>
+            <NativeSelect
+              id="salesperson-login"
+              name="userId"
+              defaultValue={salesperson?.userId ?? ""}
+              className="w-full"
+            >
+              <NativeSelectOption value="">No login</NativeSelectOption>
+              {logins.map((login) => (
+                <NativeSelectOption key={login.userId} value={login.userId}>
+                  {login.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <FieldDescription>
+              The member who signs in to acknowledge stock and supply dealers.
+            </FieldDescription>
+          </Field>
+        </div>
         <Field>
           <FieldLabel htmlFor="salesperson-notes">Notes</FieldLabel>
           <Textarea
