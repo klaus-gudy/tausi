@@ -35,12 +35,13 @@ import {
 } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 
-// Each item names the permission its page needs, so members only see what
-// their role opens. Pages still check it themselves; hiding is a courtesy.
-// The pages that are still to come use their module's read permission.
+// Each item names the permission its page needs, or several when any of them
+// opens it, so members only see what their role opens. Pages still check it
+// themselves; hiding is a courtesy. The pages that are still to come use their
+// module's read permission.
 const navGroups: {
   label: string
-  items: { title: string; href: string; icon: LucideIcon; permission?: string }[]
+  items: { title: string; href: string; icon: LucideIcon; permission?: string | string[] }[]
 }[] = [
   {
     label: "Overview",
@@ -59,8 +60,13 @@ const navGroups: {
   {
     label: "Field sales",
     items: [
-      { title: "Deliveries", href: "/deliveries", icon: Truck, permission: "stock.read" },
-      { title: "Salespeople", href: "/salespeople", icon: UserCheck, permission: "members.read" },
+      {
+        title: "Deliveries",
+        href: "/deliveries",
+        icon: Truck,
+        permission: ["deliveries.read", "deliveries.record"],
+      },
+      { title: "Salespeople", href: "/salespeople", icon: UserCheck, permission: "salespeople.read" },
     ],
   },
   {
@@ -109,7 +115,9 @@ export function SidebarNav({ permissions }: { permissions: string[] }) {
   const pathname = usePathname()
   const held = new Set(permissions)
   return navGroups.map((group) => {
-    const items = group.items.filter((item) => !item.permission || held.has(item.permission))
+    const items = group.items.filter(
+      (item) => !item.permission || [item.permission].flat().some((key) => held.has(key))
+    )
     if (!items.length) return null
     return (
       <SidebarGroup key={group.label}>
