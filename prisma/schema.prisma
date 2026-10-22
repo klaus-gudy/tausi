@@ -34,21 +34,24 @@ model User {
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
 
-  memberships          Membership[]        @relation("MembershipUser")
-  membershipsInvited   Membership[]        @relation("MembershipInvitedBy")
-  organizationsCreated Organization[]
-  invitationsSent      Invitation[]        @relation("InvitationInvitedBy")
-  invitationsAccepted  Invitation[]        @relation("InvitationAcceptedBy")
-  authAccounts         AuthAccount[]
-  sessions             Session[]
-  verificationTokens   VerificationToken[]
-  stockMovements       StockMovement[]
-  transfersCreated     StockTransfer[]     @relation("TransferCreatedBy")
-  transfersDispatched  StockTransfer[]     @relation("TransferDispatchedBy")
-  transfersArrived     StockTransfer[]     @relation("TransferArrivedBy")
-  transfersCancelled   StockTransfer[]     @relation("TransferCancelledBy")
-  productsCreated      Product[]           @relation("ProductCreatedBy")
-  productsUpdated      Product[]           @relation("ProductUpdatedBy")
+  memberships           Membership[]        @relation("MembershipUser")
+  membershipsInvited    Membership[]        @relation("MembershipInvitedBy")
+  organizationsCreated  Organization[]
+  invitationsSent       Invitation[]        @relation("InvitationInvitedBy")
+  invitationsAccepted   Invitation[]        @relation("InvitationAcceptedBy")
+  authAccounts          AuthAccount[]
+  sessions              Session[]
+  verificationTokens    VerificationToken[]
+  stockMovements        StockMovement[]
+  transfersCreated      StockTransfer[]     @relation("TransferCreatedBy")
+  transfersDispatched   StockTransfer[]     @relation("TransferDispatchedBy")
+  transfersArrived      StockTransfer[]     @relation("TransferArrivedBy")
+  transfersCancelled    StockTransfer[]     @relation("TransferCancelledBy")
+  transfersAcknowledged StockTransfer[]     @relation("TransferAcknowledgedBy")
+  salespeople           Salesperson[]
+  deliveriesRecorded    Delivery[]
+  productsCreated       Product[]           @relation("ProductCreatedBy")
+  productsUpdated       Product[]           @relation("ProductUpdatedBy")
 
   @@map("users")
 }
@@ -147,6 +150,7 @@ model Organization {
   salespeople    Salesperson[]
   stockMovements StockMovement[]
   stockTransfers StockTransfer[]
+  deliveries     Delivery[]
 
   @@unique([name], map: "organizations_name_key", where: raw("deleted_at IS NULL"))
   @@map("organizations")
@@ -293,6 +297,7 @@ model Product {
   createdBy      User?           @relation("ProductCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy      User?           @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   stockMovements StockMovement[]
+  deliveryLines  DeliveryLine[]
 
   @@unique([organizationId, code])
   @@map("products")
@@ -326,6 +331,7 @@ model SuperDealer {
   region         Region?         @relation(fields: [regionKey], references: [key], onDelete: Restrict)
   district       District?       @relation(fields: [regionKey, districtKey], references: [regionKey, key], onDelete: Restrict)
   stockMovements StockMovement[]
+  deliveries     Delivery[]
 
   @@unique([organizationId, shopName])
   @@index([regionKey])
@@ -390,8 +396,8 @@ model StockMovement {
   @@map("stock_movements")
 }
 
-// The field staff stock is sent to. They don't sign in; the storekeeper
-// records transfers to them.
+// The field staff stock is sent to. Linked to a member's login, they
+// acknowledge the stock they receive and record what they supply to dealers.
 model Salesperson {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
@@ -402,6 +408,8 @@ model Salesperson {
   email          String?   @db.Citext
   // The zone they cover.
   zoneKey        String?   @map("zone_key")
+  // The member who signs in as this salesperson.
+  userId         String?   @map("user_id") @db.Uuid
   notes          String?
   // Inactive salespeople keep their history but can't be sent stock.
   deactivatedAt  DateTime? @map("deactivated_at") @db.Timestamptz
@@ -410,9 +418,12 @@ model Salesperson {
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   zone         Zone?           @relation(fields: [zoneKey], references: [key], onDelete: Restrict)
+  user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   transfers    StockTransfer[]
+  deliveries   Delivery[]
 
   @@unique([organizationId, name])
+  @@unique([organizationId, userId])
   @@map("salespeople")
 }
 
@@ -433,34 +444,38 @@ enum StockTransferStatus {
 // "transferred" stock movements, made when it is initiated, so stock on hand
 // drops straight away. Cancelling reverses them.
 model StockTransfer {
-  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String              @map("organization_id") @db.Uuid
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String              @map("organization_id") @db.Uuid
   // 1, 2, 3… per organization, shown as TR-0001.
-  number         Int
-  salespersonId  String              @map("salesperson_id") @db.Uuid
-  status         StockTransferStatus @default(initiated)
+  number           Int
+  salespersonId    String              @map("salesperson_id") @db.Uuid
+  status           StockTransferStatus @default(initiated)
   // Dispatch note or vehicle number.
-  reference      String?
-  note           String?
+  reference        String?
+  note             String?
   // The day the stock was taken off the shelf.
-  initiatedOn    DateTime            @map("initiated_on") @db.Date
-  createdById    String?             @map("created_by_id") @db.Uuid
-  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz
-  dispatchedAt   DateTime?           @map("dispatched_at") @db.Timestamptz
-  dispatchedById String?             @map("dispatched_by_id") @db.Uuid
-  arrivedAt      DateTime?           @map("arrived_at") @db.Timestamptz
-  arrivedById    String?             @map("arrived_by_id") @db.Uuid
-  cancelledAt    DateTime?           @map("cancelled_at") @db.Timestamptz
-  cancelledById  String?             @map("cancelled_by_id") @db.Uuid
+  initiatedOn      DateTime            @map("initiated_on") @db.Date
+  createdById      String?             @map("created_by_id") @db.Uuid
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  dispatchedAt     DateTime?           @map("dispatched_at") @db.Timestamptz
+  dispatchedById   String?             @map("dispatched_by_id") @db.Uuid
+  arrivedAt        DateTime?           @map("arrived_at") @db.Timestamptz
+  arrivedById      String?             @map("arrived_by_id") @db.Uuid
+  cancelledAt      DateTime?           @map("cancelled_at") @db.Timestamptz
+  cancelledById    String?             @map("cancelled_by_id") @db.Uuid
+  // The salesperson confirmed they have it; only then can they supply it.
+  acknowledgedAt   DateTime?           @map("acknowledged_at") @db.Timestamptz
+  acknowledgedById String?             @map("acknowledged_by_id") @db.Uuid
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // NoAction like StockMovement.superDealer: salespeople are deactivated, not deleted.
-  salesperson  Salesperson     @relation(fields: [salespersonId], references: [id], onDelete: NoAction)
-  createdBy    User?           @relation("TransferCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  dispatchedBy User?           @relation("TransferDispatchedBy", fields: [dispatchedById], references: [id], onDelete: SetNull)
-  arrivedBy    User?           @relation("TransferArrivedBy", fields: [arrivedById], references: [id], onDelete: SetNull)
-  cancelledBy  User?           @relation("TransferCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
-  movements    StockMovement[]
+  salesperson    Salesperson     @relation(fields: [salespersonId], references: [id], onDelete: NoAction)
+  createdBy      User?           @relation("TransferCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dispatchedBy   User?           @relation("TransferDispatchedBy", fields: [dispatchedById], references: [id], onDelete: SetNull)
+  arrivedBy      User?           @relation("TransferArrivedBy", fields: [arrivedById], references: [id], onDelete: SetNull)
+  cancelledBy    User?           @relation("TransferCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  acknowledgedBy User?           @relation("TransferAcknowledgedBy", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+  movements      StockMovement[]
 
   @@unique([organizationId, number])
   @@index([organizationId, status])
@@ -476,8 +491,8 @@ model StockTransfer {
 // a list instead of typing it. Keys are slugs of the names: "coastal",
 // "dar-es-salaam", "kinondoni".
 model Zone {
-  key      String   @id
-  name     String
+  key         String        @id
+  name        String
   // Order in lists, roughly coast first and Zanzibar last.
   position    Int           @db.SmallInt
   regions     Region[]
@@ -487,9 +502,9 @@ model Zone {
 }
 
 model Region {
-  key          String        @id
-  zoneKey      String        @map("zone_key")
-  name         String
+  key     String @id
+  zoneKey String @map("zone_key")
+  name    String
 
   zone         Zone          @relation(fields: [zoneKey], references: [key], onDelete: Restrict)
   districts    District[]
@@ -501,9 +516,9 @@ model Region {
 
 // Unique within its region only.
 model District {
-  regionKey    String        @map("region_key")
-  key          String
-  name         String
+  regionKey String @map("region_key")
+  key       String
+  name      String
 
   region       Region        @relation(fields: [regionKey], references: [key], onDelete: Restrict)
   superDealers SuperDealer[]
@@ -525,4 +540,55 @@ model RateLimit {
 
   @@index([resetAt])
   @@map("rate_limits")
+}
+
+// ---------------------------------------------------------------------------
+// Deliveries
+// ---------------------------------------------------------------------------
+
+// Stock a salesperson supplies to a super dealer from what they hold. What a
+// salesperson holds is the stock of their acknowledged transfers less their
+// deliveries, so it isn't stored either. The store's stock ledger is not
+// touched: that stock left the store with the transfer.
+model Delivery {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  // 1, 2, 3… per organization, shown as DL-0001.
+  number         Int
+  salespersonId  String   @map("salesperson_id") @db.Uuid
+  superDealerId  String   @map("super_dealer_id") @db.Uuid
+  // The day the dealer got it, which may be before it was recorded.
+  deliveredOn    DateTime @map("delivered_on") @db.Date
+  // Delivery note or receipt number.
+  reference      String?
+  note           String?
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // NoAction: salespeople and dealers are deactivated, not deleted.
+  salesperson  Salesperson    @relation(fields: [salespersonId], references: [id], onDelete: NoAction)
+  superDealer  SuperDealer    @relation(fields: [superDealerId], references: [id], onDelete: NoAction)
+  createdBy    User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  lines        DeliveryLine[]
+
+  @@unique([organizationId, number])
+  @@index([salespersonId])
+  @@index([superDealerId])
+  @@map("deliveries")
+}
+
+model DeliveryLine {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deliveryId String @map("delivery_id") @db.Uuid
+  productId  String @map("product_id") @db.Uuid
+  // Units handed over; always positive.
+  quantity   Int
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: NoAction)
+
+  @@unique([deliveryId, productId])
+  @@index([productId])
+  @@map("delivery_lines")
 }
