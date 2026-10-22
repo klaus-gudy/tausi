@@ -1,0 +1,194 @@
+"use client";
+
+import { useState } from "react";
+import { Plus } from "lucide-react";
+import { toast } from "sonner";
+
+import { saveSalesperson } from "./actions";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+import { useFormAction } from "@/hooks/use-form-action";
+import { formatPhone } from "@/lib/dealers";
+import type { ActionResult } from "@/lib/inventory";
+
+export type EditableSalesperson = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  zoneKey: string | null;
+  notes: string | null;
+};
+
+export type ZoneOption = { key: string; name: string };
+
+const initialState: ActionResult = { message: "" };
+
+/** The "Add salesperson" button and its dialog. */
+export function AddSalespersonDialog({ zones }: { zones: ZoneOption[] }) {
+  const [open, setOpen] = useState(false);
+  // Remounting the form clears it for the next salesperson.
+  const [formKey, setFormKey] = useState(0);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setFormKey((key) => key + 1);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button>
+          <Plus data-icon="inline-start" />
+          Add salesperson
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <SalespersonForm key={formKey} zones={zones} onSaved={() => setOpen(false)} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Edits a salesperson; opened from their row menu. */
+export function EditSalespersonDialog({
+  salesperson,
+  zones,
+  open,
+  onOpenChange,
+}: {
+  salesperson: EditableSalesperson;
+  zones: ZoneOption[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {open ? (
+          <SalespersonForm
+            salesperson={salesperson}
+            zones={zones}
+            onSaved={() => onOpenChange(false)}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SalespersonForm({
+  salesperson,
+  zones,
+  onSaved,
+}: {
+  salesperson?: EditableSalesperson;
+  zones: ZoneOption[];
+  onSaved: () => void;
+}) {
+  const [state, onSubmit, pending] = useFormAction(
+    async (previous: ActionResult, formData: FormData) => {
+      const result = await saveSalesperson(previous, formData);
+      if (result.success) {
+        toast.success(result.message);
+        onSaved();
+      }
+      return result;
+    },
+    initialState
+  );
+
+  return (
+    <form onSubmit={onSubmit}>
+      <DialogHeader>
+        <DialogTitle>{salesperson ? `Edit ${salesperson.name}` : "Add a salesperson"}</DialogTitle>
+        <DialogDescription>Field staff the store sends stock to.</DialogDescription>
+      </DialogHeader>
+      {salesperson ? <input type="hidden" name="id" value={salesperson.id} /> : null}
+      <FieldGroup className="py-4">
+        <Field>
+          <FieldLabel htmlFor="salesperson-name">Name</FieldLabel>
+          <Input
+            id="salesperson-name"
+            name="name"
+            defaultValue={salesperson?.name}
+            placeholder="Juma Mwakyusa"
+            autoComplete="off"
+            maxLength={200}
+            required
+          />
+        </Field>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="salesperson-phone">Phone</FieldLabel>
+            <Input
+              id="salesperson-phone"
+              name="phone"
+              type="tel"
+              defaultValue={salesperson?.phone ? formatPhone(salesperson.phone) : ""}
+              placeholder="0715 234 567"
+              autoComplete="off"
+              maxLength={40}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="salesperson-email">Email</FieldLabel>
+            <Input
+              id="salesperson-email"
+              name="email"
+              type="email"
+              defaultValue={salesperson?.email ?? ""}
+              autoComplete="off"
+              maxLength={200}
+            />
+          </Field>
+        </div>
+        <Field>
+          <FieldLabel htmlFor="salesperson-zone">Zone</FieldLabel>
+          <NativeSelect
+            id="salesperson-zone"
+            name="zoneKey"
+            defaultValue={salesperson?.zoneKey ?? ""}
+            className="w-full"
+          >
+            <NativeSelectOption value="">No zone</NativeSelectOption>
+            {zones.map((zone) => (
+              <NativeSelectOption key={zone.key} value={zone.key}>
+                {zone.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="salesperson-notes">Notes</FieldLabel>
+          <Textarea
+            id="salesperson-notes"
+            name="notes"
+            defaultValue={salesperson?.notes ?? ""}
+            maxLength={1000}
+            rows={2}
+          />
+        </Field>
+        {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
+      </FieldGroup>
+      <DialogFooter>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : salesperson ? "Save changes" : "Add salesperson"}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
