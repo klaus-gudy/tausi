@@ -41,6 +41,8 @@ export type EditableDealer = {
   email: string | null;
   regionKey: string | null;
   districtKey: string | null;
+  tin: string | null;
+  businessLicence: string | null;
   address: string | null;
   notes: string | null;
 };
@@ -104,7 +106,6 @@ function DealerForm({
   places: PlaceZone[];
   onSaved: () => void;
 }) {
-  const [regionKey, setRegionKey] = useState(dealer?.regionKey ?? "");
   const [state, onSubmit, pending] = useFormAction(
     async (previous: ActionResult, formData: FormData) => {
       const result = await saveSuperDealer(previous, formData);
@@ -116,9 +117,6 @@ function DealerForm({
     },
     initialState
   );
-
-  const zone = places.find((zone) => zone.regions.some((region) => region.key === regionKey));
-  const region = zone?.regions.find((region) => region.key === regionKey);
 
   return (
     <form onSubmit={onSubmit}>
@@ -178,48 +176,32 @@ function DealerForm({
               maxLength={200}
             />
           </Field>
+          <PlaceFields
+            places={places}
+            regionKey={dealer?.regionKey ?? null}
+            districtKey={dealer?.districtKey ?? null}
+          />
           <Field>
-            <FieldLabel htmlFor="dealer-region">Region</FieldLabel>
-            <NativeSelect
-              id="dealer-region"
-              name="regionKey"
-              value={regionKey}
-              onChange={(event) => setRegionKey(event.target.value)}
-              className="w-full"
-            >
-              <NativeSelectOption value="">No region</NativeSelectOption>
-              {places.map((zone) => (
-                <NativeSelectOptGroup key={zone.key} label={zone.name}>
-                  {zone.regions.map((region) => (
-                    <NativeSelectOption key={region.key} value={region.key}>
-                      {region.name}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelectOptGroup>
-              ))}
-            </NativeSelect>
-            {zone ? <FieldDescription>{zone.name}</FieldDescription> : null}
+            <FieldLabel htmlFor="dealer-tin">TIN</FieldLabel>
+            <Input
+              id="dealer-tin"
+              name="tin"
+              defaultValue={dealer?.tin ?? ""}
+              placeholder="123-456-789"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={20}
+            />
           </Field>
           <Field>
-            <FieldLabel htmlFor="dealer-district">District</FieldLabel>
-            {/* Remounted per region so a district from another region is cleared. */}
-            <NativeSelect
-              key={regionKey}
-              id="dealer-district"
-              name="districtKey"
-              defaultValue={regionKey === dealer?.regionKey ? (dealer.districtKey ?? "") : ""}
-              className="w-full"
-              disabled={!region}
-            >
-              <NativeSelectOption value="">
-                {region ? "No district" : "Pick a region first"}
-              </NativeSelectOption>
-              {region?.districts.map((district) => (
-                <NativeSelectOption key={district.key} value={district.key}>
-                  {district.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <FieldLabel htmlFor="dealer-licence">Business licence no.</FieldLabel>
+            <Input
+              id="dealer-licence"
+              name="businessLicence"
+              defaultValue={dealer?.businessLicence ?? ""}
+              autoComplete="off"
+              maxLength={50}
+            />
           </Field>
         </div>
         <Field>
@@ -251,5 +233,71 @@ function DealerForm({
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+/**
+ * Region and district pickers: regions grouped by zone, with the zone shown
+ * once one is picked, and only that region's districts. Two grid cells.
+ */
+export function PlaceFields({
+  places,
+  regionKey: initialRegionKey,
+  districtKey,
+}: {
+  places: PlaceZone[];
+  regionKey: string | null;
+  districtKey: string | null;
+}) {
+  const [regionKey, setRegionKey] = useState(initialRegionKey ?? "");
+  const zone = places.find((zone) => zone.regions.some((region) => region.key === regionKey));
+  const region = zone?.regions.find((region) => region.key === regionKey);
+
+  return (
+    <>
+      <Field>
+        <FieldLabel htmlFor="dealer-region">Region</FieldLabel>
+        <NativeSelect
+          id="dealer-region"
+          name="regionKey"
+          value={regionKey}
+          onChange={(event) => setRegionKey(event.target.value)}
+          className="w-full"
+        >
+          <NativeSelectOption value="">No region</NativeSelectOption>
+          {places.map((zone) => (
+            <NativeSelectOptGroup key={zone.key} label={zone.name}>
+              {zone.regions.map((region) => (
+                <NativeSelectOption key={region.key} value={region.key}>
+                  {region.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelectOptGroup>
+          ))}
+        </NativeSelect>
+        {zone ? <FieldDescription>{zone.name}</FieldDescription> : null}
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="dealer-district">District</FieldLabel>
+        {/* Remounted per region so a district from another region is cleared. */}
+        <NativeSelect
+          key={regionKey}
+          id="dealer-district"
+          name="districtKey"
+          defaultValue={regionKey === initialRegionKey ? (districtKey ?? "") : ""}
+          className="w-full"
+          disabled={!region}
+        >
+          <NativeSelectOption value="">
+            {region ? "No district" : "Pick a region first"}
+          </NativeSelectOption>
+          {region?.districts.map((district) => (
+            <NativeSelectOption key={district.key} value={district.key}>
+              {district.name}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </Field>
+    </>
   );
 }
