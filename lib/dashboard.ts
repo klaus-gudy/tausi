@@ -244,3 +244,34 @@ export function windowStart() {
   start.setUTCDate(start.getUTCDate() - (WINDOW_DAYS - 1))
   return start
 }
+
+/**
+ * The store's own work over the window: what came in from suppliers and what
+ * went out to salespeople, each less any reversed since.
+ */
+export async function readStoreActivity(organizationId: string) {
+  const [row] = await getPrisma().$queryRaw<
+    { received_units: bigint; received_value: bigint; sent_units: bigint; sent_value: bigint }[]
+  >`
+    WITH moved AS (
+      SELECT COALESCE(original.type, m.type) AS type, m.quantity, p.selling_price
+      FROM stock_movements m
+      JOIN products p ON p.id = m.product_id
+      LEFT JOIN stock_movements original ON original.id = m.reverses_id
+      WHERE m.organization_id = ${organizationId}::uuid
+        AND m.occurred_on > ${TODAY} - ${WINDOW_DAYS}::int
+        AND (m.type IN ('received', 'transferred')
+             OR (m.type = 'reversal' AND original.type IN ('received', 'transferred')))
+    )
+    SELECT COALESCE(SUM(quantity) FILTER (WHERE type = 'received'), 0) AS received_units,
+           COALESCE(SUM(quantity::bigint * selling_price) FILTER (WHERE type = 'received'), 0) AS received_value,
+           COALESCE(-SUM(quantity) FILTER (WHERE type = 'transferred'), 0) AS sent_units,
+           COALESCE(-SUM(quantity::bigint * selling_price) FILTER (WHERE type = 'transferred'), 0) AS sent_value
+    FROM moved`
+  return {
+    receivedUnits: Number(row.received_units),
+    receivedValue: Number(row.received_value),
+    sentUnits: Number(row.sent_units),
+    sentValue: Number(row.sent_value),
+  }
+}

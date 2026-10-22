@@ -2,10 +2,29 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import Link from "next/link";
 import { Suspense } from "react";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CircleAlert, Minus } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowLeftRight,
+  ArrowUpRight,
+  CircleAlert,
+  LayoutDashboard,
+  Minus,
+  PackagePlus,
+  Store,
+  Truck,
+  UserPlus,
+} from "lucide-react";
 
 import { SupplyChart } from "./supply-chart";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import {
   Card,
   CardAction,
@@ -27,6 +46,7 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   readFieldStock,
   readSalespeopleSupply,
+  readStoreActivity,
   readStoreStock,
   readStuckTransfers,
   readSupply,
@@ -35,7 +55,7 @@ import {
   windowStart,
 } from "@/lib/dashboard";
 import { dealerName } from "@/lib/dealers";
-import { heldStock, readOwnSalesperson } from "@/lib/deliveries";
+import { deliveryNumber, heldStock, readOwnSalesperson } from "@/lib/deliveries";
 import { formatCompact, formatCount, formatDay, formatMoney } from "@/lib/format";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -44,6 +64,9 @@ import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
 export const metadata: Metadata = {
   title: "Dashboard",
 };
+
+type StoreStock = Awaited<ReturnType<typeof readStoreStock>>;
+type StuckTransfers = Awaited<ReturnType<typeof readStuckTransfers>>;
 
 // A product is running low when it lasts fewer days than this at its recent pace.
 const LOW_DAYS = 14;
@@ -66,31 +89,94 @@ export default function DashboardPage() {
 }
 
 async function Welcome() {
-  const user = await getCurrentUser();
+  await connection();
+  const [user, member] = await Promise.all([getCurrentUser(), readActiveMember()]);
   return (
     <p className="text-muted-foreground">
       Welcome back{user.name ? `, ${user.name}` : ""}.
-      {user.organization ? ` You're in ${user.organization.name}.` : null}
+      {member
+        ? ` You're in ${member.organization.name} as ${article(member.role.name)} ${member.role.name}.`
+        : user.organization
+          ? ` You're in ${user.organization.name}.`
+          : null}
     </p>
   );
 }
 
-/** What the member's role lets them see: the business, their own field work, or both. */
+/**
+ * Each role gets the dashboard its permissions call for, so custom roles work
+ * too: a salesperson sees their own stock and deliveries, a storekeeper the
+ * store and what it sends out, and those who can see deliveries the whole
+ * business, supply to dealers included.
+ */
 async function Metrics() {
   await connection();
   const member = await readActiveMember();
   if (!member) return null;
-  const own = member.permissions.has("deliveries.record") ? await readOwnSalesperson(member) : null;
-  const business = member.permissions.has("stock.read");
+  const { permissions } = member;
+  const own = permissions.has("deliveries.record") ? await readOwnSalesperson(member) : null;
+  const business = permissions.has("stock.read") && permissions.has("deliveries.read");
+  const store = permissions.has("stock.read") && !business;
 
   return (
     <>
+      <QuickActions member={member} recordsDeliveries={!!own} />
       {own ? <OwnMetrics member={member} salesperson={own} /> : null}
       {business ? <BusinessMetrics member={member} /> : null}
+      {store ? <StoreMetrics member={member} /> : null}
+      {!own && !business && !store ? (
+        <NothingToShow unlinked={permissions.has("deliveries.record")} />
+      ) : null}
     </>
   );
 }
 
+/** Shortcuts to the work the role does most. */
+function QuickActions({ member, recordsDeliveries }: { member: ActiveMember; recordsDeliveries: boolean }) {
+  const { permissions } = member;
+  const actions = [
+    recordsDeliveries && { label: "Record a delivery", href: "/deliveries", icon: Truck },
+    permissions.has("stock.receive") && { label: "Receive stock", href: "/stock", icon: PackagePlus },
+    permissions.has("stock.transfer") && { label: "Send stock to a salesperson", href: "/transfers", icon: ArrowLeftRight },
+    permissions.has("dealers.onboard") && { label: "Onboard a dealer", href: "/super-dealers/onboard", icon: Store },
+    permissions.has("members.invite") && { label: "Invite a member", href: "/members", icon: UserPlus },
+  ].filter((action) => !!action);
+  if (!actions.length) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {actions.map((action) => (
+        <Button key={action.label} asChild variant="outline" size="sm">
+          <Link href={action.href}>
+            <action.icon />
+            {action.label}
+          </Link>
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+/** For a role with nothing to chart, or a salesperson not yet linked to a login. */
+function NothingToShow({ unlinked }: { unlinked: boolean }) {
+  return (
+    <Empty className="border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <LayoutDashboard />
+        </EmptyMedia>
+        <EmptyTitle>Nothing to show here yet</EmptyTitle>
+        <EmptyDescription>
+          {unlinked
+            ? "Your sign-in isn't linked to a salesperson yet. Ask an owner or admin to link it under Salespeople, and your stock and deliveries will show here."
+            : "Your role doesn't include stock or deliveries. Use the menu to get to the pages you can see."}
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+/** The whole business: store, field stock and supply to dealers. */
 async function BusinessMetrics({ member }: { member: ActiveMember }) {
   const organizationId = member.organization.id;
   const showSalespeople = member.permissions.has("salespeople.read");
@@ -113,10 +199,6 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
   ]);
   const held = showSalespeople ? await heldStock(organizationId) : new Map<string, Map<string, number>>();
 
-  const low = store.products
-    .filter((product) => product.daysLeft !== null && product.daysLeft < LOW_DAYS)
-    .sort((a, b) => a.daysLeft! - b.daysLeft!)
-    .slice(0, 6);
   const quiet = supply.quietDealerIds.slice(0, 6);
   const quietDealers = quiet.length
     ? await prisma.superDealer.findMany({
@@ -172,94 +254,8 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Running low</CardTitle>
-            <CardDescription>
-              Products that last under {LOW_DAYS} days at the last {WINDOW_DAYS} days&apos; pace.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {low.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">On hand</TableHead>
-                    <TableHead className="hidden text-right sm:table-cell">Out per day</TableHead>
-                    <TableHead className="text-right">Lasts</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {low.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <span className="font-medium">{product.name}</span>
-                        {product.size ? <span className="text-muted-foreground"> {product.size}</span> : null}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCount(product.onHand)}</TableCell>
-                      <TableCell className="hidden text-right tabular-nums sm:table-cell">
-                        {product.perDay < 10 ? product.perDay.toFixed(1) : formatCount(Math.round(product.perDay))}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DaysLeft days={product.daysLeft!} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Every product that moved lately has at least {LOW_DAYS} days of stock.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Transfers waiting</CardTitle>
-            <CardDescription>
-              Picked over a day ago and not dispatched, or dispatched over two days ago and not
-              acknowledged.
-            </CardDescription>
-            <CardAction>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/transfers">All transfers</Link>
-              </Button>
-            </CardAction>
-          </CardHeader>
-          <CardContent>
-            {stuck.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Transfer</TableHead>
-                    <TableHead>Salesperson</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Waiting</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stuck.slice(0, 6).map((transfer) => (
-                    <TableRow key={transfer.id}>
-                      <TableCell className="font-medium">{transferNumber(transfer.number)}</TableCell>
-                      <TableCell>{transfer.salesperson.name}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {TRANSFER_STATUS_LABELS[transfer.status]}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {transfer.days} {transfer.days === 1 ? "day" : "days"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-sm text-muted-foreground">No transfers are held up.</p>
-            )}
-          </CardContent>
-        </Card>
+        <RunningLowCard products={store.products} />
+        <StuckTransfersCard transfers={stuck} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -356,6 +352,104 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
   );
 }
 
+/** For a storekeeper: the store, what came in and what went out to salespeople. */
+async function StoreMetrics({ member }: { member: ActiveMember }) {
+  const organizationId = member.organization.id;
+  const showSalespeople = member.permissions.has("salespeople.read");
+  const prisma = getPrisma();
+  const [store, activity, field, stuck, held, salespeople, products] = await Promise.all([
+    readStoreStock(organizationId),
+    readStoreActivity(organizationId),
+    readFieldStock(organizationId),
+    readStuckTransfers(organizationId),
+    showSalespeople ? heldStock(organizationId) : new Map<string, Map<string, number>>(),
+    showSalespeople
+      ? prisma.salesperson.findMany({
+          where: { organizationId, deactivatedAt: null },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : [],
+    prisma.product.findMany({ where: { organizationId }, select: { id: true, sellingPrice: true } }),
+  ]);
+  const price = new Map(products.map((product) => [product.id, product.sellingPrice]));
+  const holdings = salespeople
+    .map((salesperson) => {
+      const holding = [...(held.get(salesperson.id)?.entries() ?? [])];
+      return {
+        ...salesperson,
+        units: holding.reduce((sum, [, units]) => sum + units, 0),
+        value: holding.reduce((sum, [id, units]) => sum + units * (price.get(id) ?? 0), 0),
+      };
+    })
+    .sort((a, b) => b.value - a.value);
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatTile
+          label="Stock value in store"
+          value={formatMoney(store.value, true)}
+          detail={`${formatCompact(store.units)} units · ${store.outOfStock} ${store.outOfStock === 1 ? "product" : "products"} out of stock`}
+        />
+        <StatTile
+          label={`Received, last ${WINDOW_DAYS} days`}
+          value={formatMoney(activity.receivedValue, true)}
+          detail={`${formatCompact(activity.receivedUnits)} units in from suppliers`}
+        />
+        <StatTile
+          label={`Sent to salespeople, last ${WINDOW_DAYS} days`}
+          value={formatMoney(activity.sentValue, true)}
+          detail={`${formatCompact(activity.sentUnits)} units`}
+        />
+        <StatTile
+          label="Stock with salespeople"
+          value={formatMoney(field.heldValue, true)}
+          detail={`${formatCompact(field.heldUnits)} units held · ${formatCompact(field.onTheWay)} on the way`}
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <RunningLowCard products={store.products} />
+        <StuckTransfersCard transfers={stuck} />
+      </div>
+
+      {showSalespeople ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock with each salesperson</CardTitle>
+            <CardDescription>What they acknowledged and haven&apos;t supplied to dealers yet.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {holdings.length ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Salesperson</TableHead>
+                    <TableHead className="text-right">Units</TableHead>
+                    <TableHead className="text-right">Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {holdings.map((salesperson) => (
+                    <TableRow key={salesperson.id}>
+                      <TableCell className="font-medium">{salesperson.name}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCount(salesperson.units)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatMoney(salesperson.value, true)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No active salespeople yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+    </>
+  );
+}
+
 /** For a signed-in salesperson: their own stock and work. */
 async function OwnMetrics({
   member,
@@ -367,7 +461,7 @@ async function OwnMetrics({
   const organizationId = member.organization.id;
   const prisma = getPrisma();
   const since = windowStart();
-  const [held, toAcknowledge, delivered, products] = await Promise.all([
+  const [held, toAcknowledge, delivered, products, recent] = await Promise.all([
     heldStock(organizationId, salesperson.id),
     prisma.stockTransfer.count({
       where: { salespersonId: salesperson.id, status: { in: ["in_transit", "arrived"] }, acknowledgedAt: null },
@@ -376,18 +470,36 @@ async function OwnMetrics({
       where: { delivery: { salespersonId: salesperson.id, deliveredOn: { gte: since } } },
       select: { quantity: true, product: { select: { sellingPrice: true } }, delivery: { select: { superDealerId: true } } },
     }),
-    prisma.product.findMany({ where: { organizationId }, select: { id: true, sellingPrice: true } }),
+    prisma.product.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, size: true, sellingPrice: true },
+    }),
+    prisma.delivery.findMany({
+      where: { salespersonId: salesperson.id },
+      orderBy: [{ deliveredOn: "desc" }, { number: "desc" }],
+      take: 6,
+      select: {
+        id: true,
+        number: true,
+        deliveredOn: true,
+        superDealer: { select: { shopName: true, contactName: true } },
+        lines: { select: { quantity: true } },
+      },
+    }),
   ]);
-  const price = new Map(products.map((product) => [product.id, product.sellingPrice]));
-  const holding = [...(held.get(salesperson.id) ?? new Map<string, number>())];
+  const product = new Map(products.map((product) => [product.id, product]));
+  const holding = [...(held.get(salesperson.id) ?? new Map<string, number>())]
+    .filter(([, units]) => units > 0)
+    .map(([id, units]) => ({ id, units, product: product.get(id) }))
+    .sort((a, b) => b.units - a.units);
 
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
           label="Stock with you"
-          value={formatMoney(holding.reduce((sum, [id, units]) => sum + units * (price.get(id) ?? 0), 0), true)}
-          detail={`${formatCount(holding.reduce((sum, [, units]) => sum + units, 0))} units`}
+          value={formatMoney(holding.reduce((sum, row) => sum + row.units * (row.product?.sellingPrice ?? 0), 0), true)}
+          detail={`${formatCount(holding.reduce((sum, row) => sum + row.units, 0))} units`}
         />
         <StatTile
           label={`You supplied, last ${WINDOW_DAYS} days`}
@@ -400,13 +512,195 @@ async function OwnMetrics({
           detail={toAcknowledge ? "Acknowledge them under Deliveries once you have the stock." : "Nothing waiting for you."}
         />
       </div>
-      <div>
-        <Button asChild variant="outline">
-          <Link href="/deliveries">Go to deliveries</Link>
-        </Button>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Your stock</CardTitle>
+            <CardDescription>What you hold to supply to dealers.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {holding.length ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="text-right">Units</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {holding.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <span className="font-medium">{row.product?.name ?? "Product"}</span>
+                        {row.product?.size ? <span className="text-muted-foreground"> {row.product.size}</span> : null}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCount(row.units)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                You hold no stock. It shows here once you acknowledge a transfer.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Your recent deliveries</CardTitle>
+            <CardDescription>The last dealers you supplied.</CardDescription>
+            <CardAction>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/deliveries">All deliveries</Link>
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            {recent.length ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Delivery</TableHead>
+                    <TableHead>Dealer</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">Units</TableHead>
+                    <TableHead className="text-right">Day</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recent.map((delivery) => (
+                    <TableRow key={delivery.id}>
+                      <TableCell className="font-medium">{deliveryNumber(delivery.number)}</TableCell>
+                      <TableCell>{dealerName(delivery.superDealer)}</TableCell>
+                      <TableCell className="hidden text-right tabular-nums sm:table-cell">
+                        {formatCount(delivery.lines.reduce((sum, line) => sum + line.quantity, 0))}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatDay(delivery.deliveredOn)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">You haven&apos;t recorded a delivery yet.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </>
   );
+}
+
+/** Products that won't last long at their recent pace, soonest out first. */
+function RunningLowCard({ products }: { products: StoreStock["products"] }) {
+  const low = products
+    .filter((product) => product.daysLeft !== null && product.daysLeft < LOW_DAYS)
+    .sort((a, b) => a.daysLeft! - b.daysLeft!)
+    .slice(0, 6);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Running low</CardTitle>
+        <CardDescription>
+          Products that last under {LOW_DAYS} days at the last {WINDOW_DAYS} days&apos; pace.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {low.length ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead className="text-right">On hand</TableHead>
+                <TableHead className="hidden text-right sm:table-cell">Out per day</TableHead>
+                <TableHead className="text-right">Lasts</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {low.map((product) => (
+                <TableRow key={product.id}>
+                  <TableCell>
+                    <span className="font-medium">{product.name}</span>
+                    {product.size ? <span className="text-muted-foreground"> {product.size}</span> : null}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCount(product.onHand)}</TableCell>
+                  <TableCell className="hidden text-right tabular-nums sm:table-cell">
+                    {product.perDay < 10 ? product.perDay.toFixed(1) : formatCount(Math.round(product.perDay))}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DaysLeft days={product.daysLeft!} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Every product that moved lately has at least {LOW_DAYS} days of stock.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Transfers held up at a step, longest waiting first. */
+function StuckTransfersCard({ transfers: stuck }: { transfers: StuckTransfers }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Transfers waiting</CardTitle>
+        <CardDescription>
+          Picked over a day ago and not dispatched, or dispatched over two days ago and not
+          acknowledged.
+        </CardDescription>
+        <CardAction>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/transfers">All transfers</Link>
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        {stuck.length ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Transfer</TableHead>
+                <TableHead>Salesperson</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Waiting</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {stuck.slice(0, 6).map((transfer) => (
+                <TableRow key={transfer.id}>
+                  <TableCell className="font-medium">{transferNumber(transfer.number)}</TableCell>
+                  <TableCell>{transfer.salesperson.name}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {TRANSFER_STATUS_LABELS[transfer.status]}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {transfer.days} {transfer.days === 1 ? "day" : "days"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-sm text-muted-foreground">No transfers are held up.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** "a" or "an" before a role name. */
+function article(word: string) {
+  return /^[aeiou]/i.test(word) ? "an" : "a";
 }
 
 /** Percentage change, or null when there's nothing to compare with. */
