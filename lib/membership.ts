@@ -5,7 +5,7 @@ import { readSession } from "@/lib/session"
 // role lets them do. Uncached: server actions call it on every request to
 // authorize themselves, and pages call it behind <Suspense>.
 
-export const SYSTEM_ROLES = ["owner", "admin", "storekeeper", "member", "viewer"] as const
+export const SYSTEM_ROLES = ["owner", "admin", "storekeeper", "salesperson", "member", "viewer"] as const
 export type SystemRole = (typeof SYSTEM_ROLES)[number]
 
 export type ActiveMember = {
