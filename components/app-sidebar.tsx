@@ -123,7 +123,8 @@ export function SidebarNav({ permissions }: { permissions: string[] }) {
       <SidebarGroup key={group.label}>
         <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
         <SidebarGroupContent>
-          <SidebarMenu>
+          {/* A sliver between items, so a hovered one never runs into the active one. */}
+          <SidebarMenu className="gap-0.5">
             {items.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
