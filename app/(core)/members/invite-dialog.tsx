@@ -117,16 +117,37 @@ function InviteForm({
       </DialogHeader>
       <FieldGroup className="py-4">
         <Field>
-          <FieldLabel htmlFor="invite-email">Email</FieldLabel>
-          <Input
-            id="invite-email"
-            name="email"
-            type="email"
-            placeholder="teammate@example.com"
-            autoComplete="off"
-            required
-          />
+          <FieldLabel htmlFor="invite-name">
+            Name <span className="font-normal text-muted-foreground">(optional)</span>
+          </FieldLabel>
+          <Input id="invite-name" name="name" placeholder="Asha Mwakyusa" autoComplete="off" maxLength={100} />
         </Field>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="invite-email">Email</FieldLabel>
+            <Input
+              id="invite-email"
+              name="email"
+              type="email"
+              placeholder="teammate@example.com"
+              autoComplete="off"
+              required
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="invite-phone">
+              Phone <span className="font-normal text-muted-foreground">(optional)</span>
+            </FieldLabel>
+            <Input
+              id="invite-phone"
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              placeholder="0754 123 456"
+              autoComplete="off"
+            />
+          </Field>
+        </div>
         <Field>
           <FieldLabel htmlFor="invite-role">Role</FieldLabel>
           <NativeSelect
