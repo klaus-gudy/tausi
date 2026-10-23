@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { normalizePhone } from "@/lib/dealers";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { assignableRoles, readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -12,6 +13,7 @@ import { createToken } from "@/lib/tokens";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const INVITATION_DAYS = 7;
+const MAX_NAME = 100;
 
 type Result = { success?: boolean; message: string };
 export type InviteState = Result & { link?: string; email?: string };
@@ -70,6 +72,15 @@ async function findRole(member: ActiveMember, roleId: string) {
   return roles.find((role) => role.id === roleId) ?? null;
 }
 
+/** The form's name and phone, with the phone in +255 form; an error message when it isn't a number. */
+function readContact(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim().replace(/\s+/g, " ").slice(0, MAX_NAME) || null;
+  const typed = String(formData.get("phone") ?? "").trim();
+  const phone = typed ? normalizePhone(typed) : null;
+  if (typed && !phone) return { error: "Enter a valid phone number, like 0754 123 456." };
+  return { name, phone, error: null };
+}
+
 export async function inviteMember(
   _previous: InviteState,
   formData: FormData
@@ -79,6 +90,8 @@ export async function inviteMember(
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!EMAIL.test(email)) return { message: "Enter a valid email address." };
+  const contact = readContact(formData);
+  if (contact.error !== null) return { message: contact.error };
 
   const role = await findRole(member, String(formData.get("roleId") ?? ""));
   if (!role) return { message: "Pick a role you're allowed to give." };
@@ -103,6 +116,8 @@ export async function inviteMember(
         data: {
           organizationId,
           email,
+          name: contact.name,
+          phone: contact.phone,
           roleId: role.id,
           tokenHash,
           invitedById: member.userId,
@@ -173,6 +188,42 @@ export async function changeMemberRole(membershipId: string, roleId: string): Pr
 
   if (result.success) revalidatePath("/", "layout");
   return result;
+}
+
+/**
+ * Saves a member's name, phone and role from the edit dialog. The role goes
+ * through changeMemberRole, so the same rules about owners apply.
+ */
+export async function updateMember(_previous: Result, formData: FormData): Promise<Result> {
+  const member = await memberWith("members.update");
+  if (!member) return notAllowed;
+
+  const membershipId = String(formData.get("id") ?? "");
+  const roleId = String(formData.get("roleId") ?? "");
+  const contact = readContact(formData);
+  if (contact.error !== null) return { message: contact.error };
+
+  const prisma = getPrisma();
+  const target = await prisma.membership.findFirst({
+    where: { id: membershipId, organizationId: member.organization.id },
+    select: { roleId: true, role: { select: { key: true } } },
+  });
+  if (!target) return { message: "That member is no longer here." };
+  if (target.role.key === "owner" && member.role.key !== "owner") {
+    return { message: "Only an owner can edit an owner." };
+  }
+
+  if (roleId && roleId !== target.roleId) {
+    const changed = await changeMemberRole(membershipId, roleId);
+    if (!changed.success) return changed;
+  }
+  await prisma.membership.update({
+    where: { id: membershipId },
+    data: { name: contact.name, phone: contact.phone },
+  });
+
+  revalidatePath("/members");
+  return { success: true, message: "Member saved." };
 }
 
 /** Removes a member, or lets members leave on their own without permission. */
