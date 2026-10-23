@@ -5,7 +5,7 @@ import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import { setWarehouseActive } from "./actions";
-import { EditWarehouseDialog, type EditableWarehouse } from "./warehouse-dialog";
+import { EditWarehouseDialog, type EditableWarehouse, type Keeper } from "./warehouse-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,10 +18,12 @@ import type { PlaceZone } from "@/lib/dealers";
 export function WarehouseMenu({
   warehouse,
   places,
+  keepers,
   inactive,
 }: {
   warehouse: EditableWarehouse;
   places: PlaceZone[];
+  keepers: Keeper[];
   inactive: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -56,7 +58,13 @@ export function WarehouseMenu({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <EditWarehouseDialog warehouse={warehouse} places={places} open={editing} onOpenChange={setEditing} />
+      <EditWarehouseDialog
+        warehouse={warehouse}
+        places={places}
+        keepers={keepers}
+        open={editing}
+        onOpenChange={setEditing}
+      />
     </>
   );
 }
