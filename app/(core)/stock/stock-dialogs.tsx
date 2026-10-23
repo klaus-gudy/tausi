@@ -28,7 +28,7 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { InputGroup } from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupText } from "@/components/ui/input-group";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCount } from "@/lib/format";
@@ -181,6 +181,9 @@ export function ProductLines({
             />
             {withCost ? (
               <InputGroup className="col-span-2 sm:col-span-1 sm:col-start-3 row-start-2 sm:row-start-1">
+                <InputGroupAddon>
+                  <InputGroupText>TZS</InputGroupText>
+                </InputGroupAddon>
                 <MoneyInput
                   name="unitCost"
                   placeholder="Unit cost"
