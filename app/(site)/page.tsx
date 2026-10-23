@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Emblem } from "@/components/landing/emblem";
 import { PackSpinner } from "@/components/landing/pack-spinner";
-import { PAD_WIDTH, padCore, padOutline } from "@/components/landing/pad-shape";
 
 export const metadata: Metadata = {
   title: "Tausi Premium pads",
@@ -118,14 +117,13 @@ export default function LandingPage() {
           </ol>
         </section>
 
-        {/* The Premium pack: one size, drawn to scale against its length. */}
+        {/* The Premium pack, in three facts. */}
         <section id="pack" className="scroll-mt-8 bg-(--mist) py-32 md:py-44">
           <div className="mx-auto w-full max-w-6xl px-6">
             <h2 className="max-w-[18ch] font-(family-name:--font-bodoni) text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-normal">
               The Premium pack.
             </h2>
-            <MeasuredPad />
-            <dl className="mt-20 grid gap-12 md:grid-cols-3 md:gap-10">
+            <dl className="mt-16 grid gap-12 md:grid-cols-3 md:gap-10">
               {PACK.map((item) => (
                 <div key={item.value} className="border-t border-(--lilac) pt-6">
                   <dt className="font-(family-name:--font-bodoni) text-3xl">{item.value}</dt>
@@ -178,31 +176,5 @@ export default function LandingPage() {
         <Link href="/login" className="hover:text-(--ink)">Staff sign in</Link>
       </footer>
     </>
-  );
-}
-
-// The pad laid flat with a rule along its length. The rule is the one place
-// the feather gold appears.
-function MeasuredPad() {
-  const length = 520;
-  return (
-    <figure className="mx-auto mt-20 w-full max-w-3xl">
-      <svg viewBox={`0 0 ${length} ${PAD_WIDTH + 60}`} className="w-full" role="img" aria-label="The pad laid flat, measured at 340 millimetres long">
-        <g stroke="var(--gold)" strokeWidth="1">
-          <line x1="10" y1="14" x2={length - 10} y2="14" />
-          <line x1="10" y1="6" x2="10" y2="22" />
-          <line x1={length - 10} y1="6" x2={length - 10} y2="22" />
-        </g>
-        <rect x={length / 2 - 40} y="2" width="80" height="24" fill="var(--mist)" />
-        <text x={length / 2} y="19" textAnchor="middle" fontSize="14" fill="var(--ink)" fontFamily="var(--font-jost)">
-          340 mm
-        </text>
-        <g transform={`translate(0 ${PAD_WIDTH + 50}) rotate(-90)`}>
-          <path d={padOutline()} fill="white" stroke="#DCCFE2" strokeWidth="1.5" />
-          <path d={padCore()} fill="none" stroke="#D8C8DE" strokeWidth="1.4" strokeDasharray="1 4" strokeLinecap="round" />
-          <rect x="84" y="196" width="32" height="128" rx="6" fill="#7A22A0" />
-        </g>
-      </svg>
-    </figure>
   );
 }
