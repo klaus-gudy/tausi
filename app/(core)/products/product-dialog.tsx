@@ -24,7 +24,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { InputGroup } from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupText } from "@/components/ui/input-group";
 import { useFormAction } from "@/hooks/use-form-action";
 import type { ActionResult } from "@/lib/inventory";
 import { productCode } from "@/lib/product-code";
@@ -111,7 +111,9 @@ function ProductForm({
       <DialogHeader>
         <DialogTitle>{product ? `Edit ${product.name}` : "Add a product"}</DialogTitle>
         <DialogDescription>
-          Stock on hand isn&apos;t set here: it comes from what you receive and issue.
+          {product
+            ? "Change its name, size or selling price."
+            : "Stock on hand isn't set here: it comes from what you receive and issue."}
         </DialogDescription>
       </DialogHeader>
       {product ? <input type="hidden" name="id" value={product.id} /> : null}
@@ -152,6 +154,9 @@ function ProductForm({
           <Field>
             <FieldLabel htmlFor="product-price">Selling price</FieldLabel>
             <InputGroup>
+              <InputGroupAddon>
+                <InputGroupText>TZS</InputGroupText>
+              </InputGroupAddon>
               <MoneyInput
                 id="product-price"
                 name="sellingPrice"
