@@ -60,8 +60,8 @@ export default function TransfersPage({ searchParams }: PageProps<"/transfers">)
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Transfers</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Transfers</h1>
+        <p className="text-sm text-muted-foreground">
           Send stock from the store to salespeople and follow it until it arrives.
         </p>
       </div>
