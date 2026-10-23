@@ -20,8 +20,6 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
-  FieldLegend,
-  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -163,151 +161,145 @@ function WarehouseForm({
       <input type="hidden" name="contactName" value={keeperName} />
       <input type="hidden" name="regionKey" value={regionKey} />
       <input type="hidden" name="districtKey" value={districtKey} />
-      <FieldGroup className="gap-6 py-4">
-        <FieldSet className="gap-3">
-          <FieldLegend className="mb-0">Basic details</FieldLegend>
+      <FieldGroup className="gap-4 py-4">
+        <Field>
+          <FieldLabel htmlFor="warehouse-name">Name</FieldLabel>
+          <Input
+            id="warehouse-name"
+            name="name"
+            defaultValue={warehouse?.name ?? ""}
+            placeholder="Mikocheni main store"
+            autoComplete="off"
+            maxLength={200}
+            required
+          />
+        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="warehouse-name">Name</FieldLabel>
+            <FieldLabel htmlFor="warehouse-keeper">
+              Storekeeper <span className="font-normal text-muted-foreground">(optional)</span>
+            </FieldLabel>
+            <Select
+              value={keeper}
+              onValueChange={(next) => {
+                setKeeper(next);
+                const picked = keepers.find((k) => k.id === next);
+                if (picked) setPhone(picked.phone ? formatPhone(picked.phone) : "");
+                if (next === NONE) setPhone("");
+              }}
+            >
+              <SelectTrigger id="warehouse-keeper" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>No storekeeper</SelectItem>
+                {savedName && !keepers.some((k) => k.name === savedName) ? (
+                  <SelectItem value={SAVED}>{savedName}</SelectItem>
+                ) : null}
+                {keepers.map((k) => (
+                  <SelectItem key={k.id} value={k.id}>
+                    {k.name}
+                    <span className="text-muted-foreground">· {k.role}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="warehouse-phone">
+              Phone <span className="font-normal text-muted-foreground">(optional)</span>
+            </FieldLabel>
             <Input
-              id="warehouse-name"
-              name="name"
-              defaultValue={warehouse?.name ?? ""}
-              placeholder="Mikocheni main store"
+              id="warehouse-phone"
+              name="phone"
+              type="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              placeholder="0754 123 456"
               autoComplete="off"
-              maxLength={200}
-              required
+              maxLength={40}
             />
           </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="warehouse-keeper">
-                Storekeeper <span className="font-normal text-muted-foreground">(optional)</span>
-              </FieldLabel>
-              <Select
-                value={keeper}
-                onValueChange={(next) => {
-                  setKeeper(next);
-                  const picked = keepers.find((k) => k.id === next);
-                  if (picked) setPhone(picked.phone ? formatPhone(picked.phone) : "");
-                  if (next === NONE) setPhone("");
-                }}
-              >
-                <SelectTrigger id="warehouse-keeper" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>No storekeeper</SelectItem>
-                  {savedName && !keepers.some((k) => k.name === savedName) ? (
-                    <SelectItem value={SAVED}>{savedName}</SelectItem>
-                  ) : null}
-                  {keepers.map((k) => (
-                    <SelectItem key={k.id} value={k.id}>
-                      {k.name}
-                      <span className="text-muted-foreground">· {k.role}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="warehouse-phone">
-                Phone <span className="font-normal text-muted-foreground">(optional)</span>
-              </FieldLabel>
-              <Input
-                id="warehouse-phone"
-                name="phone"
-                type="tel"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="0754 123 456"
-                autoComplete="off"
-                maxLength={40}
-              />
-            </Field>
-          </div>
-        </FieldSet>
-        <FieldSet className="gap-3">
-          <FieldLegend className="mb-0">Location</FieldLegend>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field>
-              <FieldLabel htmlFor="warehouse-zone">Zone</FieldLabel>
-              <Select
-                value={zoneKey || NONE}
-                onValueChange={(next) => {
-                  setZoneKey(next === NONE ? "" : next);
-                  setRegionKey("");
-                  setDistrictKey("");
-                }}
-              >
-                <SelectTrigger id="warehouse-zone" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>No zone</SelectItem>
-                  {places.map((zone) => (
-                    <SelectItem key={zone.key} value={zone.key}>
-                      {zone.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="warehouse-region">Region</FieldLabel>
-              <Select
-                value={regionKey || NONE}
-                onValueChange={(next) => {
-                  setRegionKey(next === NONE ? "" : next);
-                  setDistrictKey("");
-                }}
-                disabled={!zone}
-              >
-                <SelectTrigger id="warehouse-region" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>{zone ? "No region" : "Pick a zone first"}</SelectItem>
-                  {zone?.regions.map((region) => (
-                    <SelectItem key={region.key} value={region.key}>
-                      {region.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="warehouse-district">District</FieldLabel>
-              <Select
-                value={districtKey || NONE}
-                onValueChange={(next) => setDistrictKey(next === NONE ? "" : next)}
-                disabled={!region}
-              >
-                <SelectTrigger id="warehouse-district" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>{region ? "No district" : "Pick a region first"}</SelectItem>
-                  {region?.districts.map((district) => (
-                    <SelectItem key={district.key} value={district.key}>
-                      {district.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
           <Field>
-            <FieldLabel htmlFor="warehouse-address">Address</FieldLabel>
-            <Input
-              id="warehouse-address"
-              name="address"
-              defaultValue={warehouse?.address ?? ""}
-              placeholder="Plot 12, Nyerere Road, near the Tazara junction"
-              autoComplete="off"
-              maxLength={300}
-            />
+            <FieldLabel htmlFor="warehouse-zone">Zone</FieldLabel>
+            <Select
+              value={zoneKey || NONE}
+              onValueChange={(next) => {
+                setZoneKey(next === NONE ? "" : next);
+                setRegionKey("");
+                setDistrictKey("");
+              }}
+            >
+              <SelectTrigger id="warehouse-zone" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>No zone</SelectItem>
+                {places.map((zone) => (
+                  <SelectItem key={zone.key} value={zone.key}>
+                    {zone.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
-        </FieldSet>
+          <Field>
+            <FieldLabel htmlFor="warehouse-region">Region</FieldLabel>
+            <Select
+              value={regionKey || NONE}
+              onValueChange={(next) => {
+                setRegionKey(next === NONE ? "" : next);
+                setDistrictKey("");
+              }}
+              disabled={!zone}
+            >
+              <SelectTrigger id="warehouse-region" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>{zone ? "No region" : "Pick a zone first"}</SelectItem>
+                {zone?.regions.map((region) => (
+                  <SelectItem key={region.key} value={region.key}>
+                    {region.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="warehouse-district">District</FieldLabel>
+            <Select
+              value={districtKey || NONE}
+              onValueChange={(next) => setDistrictKey(next === NONE ? "" : next)}
+              disabled={!region}
+            >
+              <SelectTrigger id="warehouse-district" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>{region ? "No district" : "Pick a region first"}</SelectItem>
+                {region?.districts.map((district) => (
+                  <SelectItem key={district.key} value={district.key}>
+                    {district.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+        <Field>
+          <FieldLabel htmlFor="warehouse-address">Address</FieldLabel>
+          <Input
+            id="warehouse-address"
+            name="address"
+            defaultValue={warehouse?.address ?? ""}
+            placeholder="Plot 12, Nyerere Road, near the Tazara junction"
+            autoComplete="off"
+            maxLength={300}
+          />
+        </Field>
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
