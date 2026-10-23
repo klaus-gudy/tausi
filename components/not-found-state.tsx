@@ -30,7 +30,7 @@ export function NotFoundState({ className }: { className?: string }) {
       </EmptyHeader>
       <EmptyContent>
         <Button asChild>
-          <Link href="/">
+          <Link href="/dashboard">
             <LayoutDashboard data-icon="inline-start" />
             Go to overview
           </Link>
