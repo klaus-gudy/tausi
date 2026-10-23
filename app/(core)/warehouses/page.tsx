@@ -41,8 +41,8 @@ export default function WarehousesPage({ searchParams }: PageProps<"/warehouses"
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Warehouses</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Warehouses</h1>
+        <p className="text-sm text-muted-foreground">
           The places stock is kept, where they are and roughly how much they hold.
         </p>
       </div>
