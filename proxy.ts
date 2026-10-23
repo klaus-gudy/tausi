@@ -10,9 +10,13 @@ const PUBLIC_PATHS = ["/login", "/sign-up", "/invite"]
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const isPublic = PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
-  )
+  // "/" is the public landing page; matched exactly so it doesn't open
+  // every path.
+  const isPublic =
+    pathname === "/" ||
+    PUBLIC_PATHS.some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`)
+    )
   if (isPublic || request.cookies.has("session")) return NextResponse.next()
 
   return NextResponse.redirect(new URL("/login", request.url))
