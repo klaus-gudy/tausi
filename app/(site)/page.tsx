@@ -6,7 +6,7 @@ import { PackSpinner } from "@/components/landing/pack-spinner";
 export const metadata: Metadata = {
   title: "Tausi Premium pads",
   description:
-    "Soft, winged Tausi Premium pads: 340 mm long for heavy days and nights, 9 in a pack, with a disposal bag inside.",
+    "Soft, winged Tausi Premium pads in 340 mm and 390 mm, with sanitary bags in every pack.",
 };
 
 // Placeholder: replace with the sales team's real address before launch.
@@ -32,9 +32,9 @@ const REASONS = [
 ];
 
 const PACK = [
-  { value: "340 mm", text: "Long enough for heavy days and through the night." },
-  { value: "9 pads", text: "Nine pads in every pack." },
-  { value: "Bag inside", text: "A sanitary bag in every pack, for discreet disposal." },
+  { value: "340 mm", text: "Long enough for heavy days." },
+  { value: "390 mm", text: "Extra length for the heaviest days and overnight." },
+  { value: "9 pads", text: "Nine pads in the 340 mm pack." },
 ];
 
 export default function LandingPage() {
@@ -113,7 +113,7 @@ export default function LandingPage() {
           </ol>
         </section>
 
-        {/* The Premium pack, in three facts. */}
+        {/* The Premium pack: both lengths and the pack size. */}
         <section id="pack" className="scroll-mt-8 bg-(--mist) py-32 md:py-44">
           <div className="mx-auto w-full max-w-6xl px-6">
             <h2 className="max-w-[18ch] font-(family-name:--font-bodoni) text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-normal">
