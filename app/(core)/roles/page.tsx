@@ -2,21 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { Plus, ShieldCheck } from "lucide-react";
 
 import { readPermissionChoices } from "./data";
+import { NewRoleDialog } from "./new-role-dialog";
 import { NoAccessState } from "@/components/no-access-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCount } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
@@ -31,7 +22,7 @@ export default function RolesPage() {
     <>
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Roles & permissions</h1>
-        <p className=\"text-sm text-muted-foreground\">
+        <p className="text-sm text-muted-foreground">
           Open a role to see and set what it can do. Give members a role on the Members page.
         </p>
       </div>
@@ -79,12 +70,7 @@ async function Roles() {
     <>
       {canManage ? (
         <div className="flex justify-end">
-          <Button asChild>
-            <Link href="/roles/new">
-              <Plus data-icon="inline-start" />
-              New role
-            </Link>
-          </Button>
+          <NewRoleDialog />
         </div>
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -142,30 +128,6 @@ async function Roles() {
           );
         })}
       </div>
-      {ordered.length === 1 ? (
-        <Empty className="flex-none border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ShieldCheck />
-            </EmptyMedia>
-            <EmptyTitle>Only the owner role so far</EmptyTitle>
-            <EmptyDescription>
-              Add roles for the people you work with, like a storekeeper or a sales rep, and pick
-              what each can do.
-            </EmptyDescription>
-          </EmptyHeader>
-          {canManage ? (
-            <EmptyContent>
-              <Button asChild>
-                <Link href="/roles/new">
-                  <Plus data-icon="inline-start" />
-                  New role
-                </Link>
-              </Button>
-            </EmptyContent>
-          ) : null}
-        </Empty>
-      ) : null}
     </>
   );
 }
