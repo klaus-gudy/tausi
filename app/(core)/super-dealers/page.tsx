@@ -43,8 +43,8 @@ export default function SuperDealersPage({ searchParams }: PageProps<"/super-dea
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Super dealers</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Super dealers</h1>
+        <p className="text-sm text-muted-foreground">
           The shops and distributors you issue stock to.
         </p>
       </div>
