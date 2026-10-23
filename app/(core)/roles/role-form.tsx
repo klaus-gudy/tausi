@@ -48,8 +48,8 @@ function sameDraft(a: Draft, b: Draft) {
 }
 
 /**
- * A role's own page: its name and description at the top, then what it can
- * do, module by module. The same page shows the role and sets it, with Save
+ * A role's own page: its name and description in a card at the top, then
+ * what it can do, module by module. The same page shows the role and sets it, with Save
  * appearing once something changes. Read-only for the owner role and for
  * members who can't manage roles.
  */
@@ -121,8 +121,8 @@ export function RoleForm({
         <input key={key} type="hidden" name="permissions" value={key} />
       ))}
 
-      <div className="sticky top-0 z-10 -mx-4 border-b bg-background/95 px-4 py-4 backdrop-blur">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <Card className="sticky top-0 z-10">
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="grid min-w-0 flex-1 gap-1">
             <div className="flex items-center gap-2">
               <input
@@ -134,7 +134,7 @@ export function RoleForm({
                 required
                 maxLength={60}
                 autoComplete="off"
-                className={`${inline} h-10 min-w-0 text-2xl font-semibold tracking-tight`}
+                className={`${inline} h-8 min-w-0 text-lg font-semibold tracking-tight`}
               />
               {builtIn ? <Badge variant="secondary">Built-in</Badge> : null}
             </div>
@@ -147,7 +147,7 @@ export function RoleForm({
               maxLength={200}
               autoComplete="off"
               placeholder={readOnly ? "" : "Add a description, e.g. Receives and counts stock"}
-              className={`${inline} h-8 text-muted-foreground placeholder:text-muted-foreground/60`}
+              className={`${inline} h-7 text-sm text-muted-foreground placeholder:text-muted-foreground/60`}
             />
             <p className="text-xs text-muted-foreground">
               {note ?? (members === 1 ? "1 member has this role." : `${members} members have this role.`)}
@@ -181,9 +181,11 @@ export function RoleForm({
               )}
             </div>
           )}
-        </div>
-        {state.message && !state.success ? <FieldError className="mt-2">{state.message}</FieldError> : null}
-      </div>
+        </CardContent>
+        {state.message && !state.success ? (
+          <FieldError className="px-(--card-spacing)">{state.message}</FieldError>
+        ) : null}
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {choices.modules.map((group) => {
