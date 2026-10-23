@@ -31,10 +31,37 @@ export function uniqueSlug(name: string) {
   return `${base || "workspace"}-${randomBytes(3).toString("hex")}`
 }
 
+// The roles every new organization starts with besides owner. They're the
+// organization's own, so they can be renamed, changed or deleted like any other.
+const STARTER_ROLES = [
+  {
+    key: "salesperson",
+    name: "Salesperson",
+    description: "Takes stock out to super dealers and signs up new ones",
+    permissions: ["products.read", "dealers.read", "dealers.onboard", "deliveries.record"],
+  },
+  {
+    key: "storekeeper",
+    name: "Storekeeper",
+    description: "Receives, counts and sends out stock",
+    permissions: [
+      "products.read",
+      "warehouses.read",
+      "dealers.read",
+      "salespeople.read",
+      "stock.read",
+      "stock.receive",
+      "stock.issue",
+      "stock.transfer",
+      "stock.adjust",
+    ],
+  },
+]
+
 /**
- * Creates an organization with the user as its owner, and with Tanzania's
- * zones, regions and districts when withPlaces is set. Run inside a
- * transaction.
+ * Creates an organization with the user as its owner and the starter roles,
+ * and with Tanzania's zones, regions and districts when withPlaces is set.
+ * Run inside a transaction.
  */
 export async function createOrganizationWithOwner(
   tx: Prisma.TransactionClient,
@@ -51,6 +78,19 @@ export async function createOrganizationWithOwner(
   await tx.membership.create({
     data: { organizationId: organization.id, userId, roleId: owner.id },
   })
+  // Only keys the database has, in case one is renamed or dropped later.
+  const known = new Set((await tx.permission.findMany({ select: { key: true } })).map((p) => p.key))
+  for (const { permissions, ...role } of STARTER_ROLES) {
+    await tx.role.create({
+      data: {
+        ...role,
+        organizationId: organization.id,
+        permissions: {
+          create: permissions.filter((key) => known.has(key)).map((permissionKey) => ({ permissionKey })),
+        },
+      },
+    })
+  }
   if (withPlaces) await seedPlaces(tx, organization.id)
   return organization
 }
