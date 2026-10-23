@@ -8,17 +8,14 @@ import {
   memberWith,
   notAllowed,
   readText,
-  readWholeNumber,
   type ActionResult,
 } from "@/lib/inventory";
 import { getPrisma } from "@/lib/prisma";
-import { isCapacityUnit } from "@/lib/warehouses";
 
 /**
  * Adds a warehouse, or edits one when the form carries its id. Only the name
  * is required; the region and district are picked from the organization's
- * places, and the capacity is a rough estimate in one of the units in
- * lib/warehouses.ts.
+ * places, and the storekeeper's name and phone are filled in from a member.
  */
 export async function saveWarehouse(
   _previous: ActionResult,
@@ -31,14 +28,9 @@ export async function saveWarehouse(
   const name = readText(formData.get("name"));
   const regionKey = readText(formData.get("regionKey"), 100);
   const districtKey = regionKey ? readText(formData.get("districtKey"), 100) : null;
-  const typedCapacity = readText(formData.get("capacity"), 20);
-  const capacity = typedCapacity ? readWholeNumber(typedCapacity) : null;
-  const capacityUnit = readText(formData.get("capacityUnit"), 20) ?? "units";
   const typedPhone = readText(formData.get("phone"), 40);
   const phone = typedPhone ? normalizePhone(typedPhone) : null;
   if (!name) return { message: "Enter the warehouse's name." };
-  if (typedCapacity && !capacity) return { message: "Enter the capacity as a whole number above 0, or leave it empty." };
-  if (!isCapacityUnit(capacityUnit)) return { message: "Pick the capacity unit from the list." };
   if (typedPhone && !phone) return { message: "Enter a phone number like 0754 123 456, or leave it empty." };
 
   const prisma = getPrisma();
@@ -58,8 +50,6 @@ export async function saveWarehouse(
     regionKey,
     districtKey,
     address: readText(formData.get("address"), 300),
-    capacity,
-    capacityUnit,
     contactName: readText(formData.get("contactName")),
     phone,
   };
