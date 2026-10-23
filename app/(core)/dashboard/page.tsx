@@ -53,7 +53,7 @@ export default function DashboardPage() {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
         <Suspense fallback={<Skeleton className="mt-1 h-5 w-64" />}>
           <Welcome />
         </Suspense>
@@ -68,7 +68,7 @@ export default function DashboardPage() {
 async function Welcome() {
   const user = await getCurrentUser();
   return (
-    <p className="text-muted-foreground">
+    <p className="text-sm text-muted-foreground">
       Welcome back{user.name ? `, ${user.name}` : ""}.
       {user.organization ? ` You're in ${user.organization.name}.` : null}
     </p>
