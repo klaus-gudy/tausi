@@ -41,8 +41,8 @@ export default function GoodsReceivedPage({ searchParams }: PageProps<"/goods-re
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Goods received</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Goods received</h1>
+        <p className="text-sm text-muted-foreground">
           Every delivery from a supplier: what came in, at what cost, and where it was put.
         </p>
       </div>
