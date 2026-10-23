@@ -2,15 +2,17 @@
 
 import { useEffect, useRef } from "react"
 
-// The Premium pack as a real 3D box: the pack photo on the front and back,
-// and foil-purple sides. It turns on its own; dragging or the arrow keys turn
-// it by hand.
+// The Premium pack as a soft 3D pillow: the pack photo on the front and back,
+// and rounded foil-purple sides built from narrow strips around a half circle.
+// It turns on its own; dragging or the arrow keys turn it by hand.
 
 const DEGREES_PER_SECOND = 26
 // Front face proportions come from the photo (1120 × 800); depth is a share
 // of the width, about what a pack of nine holds.
 const HEIGHT = 800 / 1120
 const DEPTH = 0.3
+// Strips in each rounded side; more strips, smoother curve.
+const STRIPS = 10
 
 export function PackSpinner() {
   const packRef = useRef<HTMLDivElement>(null)
@@ -25,16 +27,11 @@ export function PackSpinner() {
     let frame = 0
 
     const paint = () => {
-      const radians = (angle.current * Math.PI) / 180
-      const face = Math.abs(Math.cos(radians))
-      const side = Math.abs(Math.sin(radians))
-      const style = packRef.current?.style
-      style?.setProperty("--angle", `${angle.current}deg`)
-      style?.setProperty("--face", face.toFixed(3))
-      style?.setProperty("--side", side.toFixed(3))
+      const face = Math.abs(Math.cos((angle.current * Math.PI) / 180))
+      packRef.current?.style.setProperty("--angle", `${angle.current}deg`)
       if (shadowRef.current) {
-        // The footprint is the front's width plus the side's depth, as seen.
-        const width = face + side * DEPTH
+        // The footprint is the front's width as seen, plus the round sides.
+        const width = (face + DEPTH) / (1 + DEPTH)
         shadowRef.current.style.transform = `scaleX(${width.toFixed(3)})`
       }
     }
@@ -82,102 +79,114 @@ export function PackSpinner() {
   }
 
   return (
-    <div className="flex flex-col items-center select-none [--w:clamp(220px,62vw,400px)] md:[--w:clamp(260px,34vw,420px)]">
+    <div className="flex flex-col items-center select-none [--w:clamp(200px,56vw,360px)] md:[--w:clamp(240px,30vw,380px)]">
       <div
         role="img"
-        aria-label="The Tausi Premium pack, 9 pads of 340 mm, turning to show its front, sides and back. Drag or use the arrow keys to turn it."
+        aria-label="The Tausi Premium pack, turning to show its front, rounded sides and back. Drag or use the arrow keys to turn it."
         tabIndex={0}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onKeyDown={onKeyDown}
-        className="relative cursor-grab touch-pan-y rounded-[2rem] px-6 py-16 outline-none [perspective:1800px] focus-visible:ring-2 focus-visible:ring-(--plum) focus-visible:ring-offset-8 active:cursor-grabbing"
+        className="relative cursor-grab touch-pan-y rounded-[2rem] px-[calc(var(--w)*0.2)] py-16 outline-none [perspective:1800px] focus-visible:ring-2 focus-visible:ring-(--plum) focus-visible:ring-offset-8 active:cursor-grabbing"
       >
         <div
           ref={packRef}
           className="relative [transform-style:preserve-3d] [transform:rotateX(-8deg)_rotateY(var(--angle))]"
           style={{ width: "var(--w)", height: `calc(var(--w) * ${HEIGHT})` }}
         >
-          {/* Front: the pack as photographed. */}
-          <Panel
-            transform={`translateZ(calc(var(--w) * ${DEPTH / 2}))`}
-            light="var(--face)"
-            className="inset-0 bg-[url(/brand/tausi-pack-front.webp)] bg-cover bg-center"
-          />
+          {/* Front and back: the pack as photographed. */}
+          <Face facing={0} />
+          <Face facing={180} />
 
-          {/* Back: the same printed face as the front. */}
-          <Panel
-            transform={`rotateY(180deg) translateZ(calc(var(--w) * ${DEPTH / 2}))`}
-            light="var(--face)"
-            className="inset-0 bg-[url(/brand/tausi-pack-front.webp)] bg-cover bg-center"
-          />
+          {/* Rounded sides: foil purple, as at the photo's edges. */}
+          {Array.from({ length: STRIPS }, (_, i) => {
+            const turn = ((i + 0.5) * 180) / STRIPS
+            return [
+              <Strip key={`r${i}`} side={1} turn={turn} />,
+              <Strip key={`l${i}`} side={-1} turn={turn} />,
+            ]
+          })}
 
-          {/* Sides: foil purple, as at the photo's edges. */}
-          <Side right />
-          <Side />
-
+          {/* Top and bottom: rounded at both ends to close the sides. */}
           <Panel
             transform={`rotateX(90deg) translateZ(calc(var(--w) * ${HEIGHT / 2}))`}
-            light="1"
-            className="top-1/2 left-0 w-full -translate-y-1/2 bg-[linear-gradient(90deg,#3E0750,#6A1C85_50%,#3E0750)]"
-            style={{ height: `calc(var(--w) * ${DEPTH})` }}
+            filter="brightness(0.95)"
+            className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[linear-gradient(90deg,#3E0750,#6A1C85_50%,#3E0750)]"
+            style={{ width: `calc(var(--w) * ${1 + DEPTH})`, height: `calc(var(--w) * ${DEPTH})` }}
           />
           <Panel
             transform={`rotateX(-90deg) translateZ(calc(var(--w) * ${HEIGHT / 2}))`}
-            light="0.7"
-            className="top-1/2 left-0 w-full -translate-y-1/2 bg-[#2A0B36]"
-            style={{ height: `calc(var(--w) * ${DEPTH})` }}
+            filter="brightness(0.7)"
+            className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2A0B36]"
+            style={{ width: `calc(var(--w) * ${1 + DEPTH})`, height: `calc(var(--w) * ${DEPTH})` }}
           />
         </div>
       </div>
       <div
         ref={shadowRef}
         aria-hidden
-        className="-mt-10 h-7 w-[calc(var(--w)*1.05)] rounded-[50%] bg-[radial-gradient(closest-side,rgba(42,11,54,0.22),transparent)]"
+        className="-mt-10 h-7 w-[calc(var(--w)*1.35)] rounded-[50%] bg-[radial-gradient(closest-side,rgba(42,11,54,0.22),transparent)]"
       />
     </div>
   )
 }
 
-function Side({ right }: { right?: boolean }) {
+// How lit a face is: full when it points at the viewer, darker as it turns
+// away. `turn` is the face's own angle within the pack.
+function lit(turn: number) {
+  return `brightness(calc(0.55 + 0.45 * max(0, cos(var(--angle) + ${turn}deg))))`
+}
+
+function Face({ facing }: { facing: number }) {
   return (
     <Panel
-      transform={`rotateY(${right ? 90 : -90}deg) translateZ(calc(var(--w) * 0.5))`}
-      light="var(--side)"
-      className="top-0 left-1/2 h-full -translate-x-1/2 flex items-center justify-center bg-[linear-gradient(90deg,#3A0548,#6E2390_45%,#5A076F_60%,#3A0548)]"
-      style={{ width: `calc(var(--w) * ${DEPTH})` }}
+      transform={`rotateY(${facing}deg) translateZ(calc(var(--w) * ${DEPTH / 2}))`}
+      filter={lit(facing)}
+      className="inset-0 bg-[url(/brand/tausi-pack-front.webp)] bg-cover bg-center"
     >
-      <span className="rotate-90 pl-[0.4em] font-(family-name:--font-cinzel) text-[calc(var(--w)*0.045)] whitespace-nowrap tracking-[0.4em] text-[#E4D6EA]">
-        TAUSI
-      </span>
+      {/* Soft shading at the top and bottom, where the foil curves away. */}
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(42,11,54,0.35),transparent_9%,transparent_91%,rgba(42,11,54,0.4))]" />
     </Panel>
   )
 }
 
-// One face of the box. `light` (0–1) is how squarely it faces the viewer, so
-// faces turned away darken.
+// One strip of a rounded side. Strips sit on a half circle whose radius is
+// half the depth, centred on the front's left or right edge.
+function Strip({ side, turn }: { side: 1 | -1; turn: number }) {
+  const radius = DEPTH / 2
+  // Each strip is the width of its slice of the curve, plus a hair of overlap
+  // so no seams show.
+  const width = 2 * radius * Math.tan(Math.PI / (2 * STRIPS))
+  return (
+    <Panel
+      transform={`translateX(calc(var(--w) * ${side * 0.5})) rotateY(${side * turn}deg) translateZ(calc(var(--w) * ${radius}))`}
+      filter={lit(side * turn)}
+      className="top-0 left-1/2 h-full -translate-x-1/2 bg-[linear-gradient(180deg,#3A0548,#6E2390_30%,#5A076F_70%,#3A0548)]"
+      style={{ width: `calc(var(--w) * ${width.toFixed(4)} + 0.75px)` }}
+    />
+  )
+}
+
+// One flat piece of the pack, hidden when it faces away.
 function Panel({
   transform,
-  light,
+  filter,
   className,
   style,
   children,
 }: {
   transform: string
-  light: string
+  filter: string
   className: string
   style?: React.CSSProperties
   children?: React.ReactNode
 }) {
   return (
     <div
-      className={`absolute overflow-hidden rounded-[3px] [backface-visibility:hidden] ${className}`}
-      style={{
-        ...style,
-        transform,
-        filter: `brightness(calc(0.62 + ${light} * 0.38))`,
-      }}
+      className={`absolute overflow-hidden [backface-visibility:hidden] ${className}`}
+      style={{ ...style, transform, filter }}
     >
       {children}
     </div>
