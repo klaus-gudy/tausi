@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { MovementMenu } from "../../stock/movement-menu";
 import { BackLink } from "../back-link";
 import { receiptLines } from "../receipts";
+import { DetailHeader } from "@/components/detail-header";
 import { NoAccessState } from "@/components/no-access-state";
 import { NotFoundState } from "@/components/not-found-state";
 import { Badge } from "@/components/ui/badge";
@@ -85,15 +86,15 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
 
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {receipt.supplierName ? `Receipt from ${receipt.supplierName}` : "Receipt"}
-        </h1>
-        <p className="text-muted-foreground">
-          {formatCount(units)} {units === 1 ? "unit" : "units"} of {lines.length}{" "}
-          {lines.length === 1 ? "product" : "products"} into {receipt.warehouse.name}
-        </p>
-      </div>
+      <DetailHeader
+        title={receipt.supplierName ? `Receipt from ${receipt.supplierName}` : "Receipt"}
+        description={
+          <>
+            {formatCount(units)} {units === 1 ? "unit" : "units"} of {lines.length}{" "}
+            {lines.length === 1 ? "product" : "products"} into {receipt.warehouse.name}
+          </>
+        }
+      />
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>
