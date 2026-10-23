@@ -48,7 +48,7 @@ export default function LandingPage() {
         <nav className="flex items-center gap-8 text-[15px] text-(--muted)">
           <a href="#why" className="hidden hover:text-(--ink) sm:inline">Why us</a>
           <a href="#pack" className="hidden hover:text-(--ink) sm:inline">The pack</a>
-          <a href="#stockists" className="hidden hover:text-(--ink) sm:inline">Stockists</a>
+          <a href="#super-dealers" className="hidden hover:text-(--ink) sm:inline">Super dealers</a>
           <Link href="/login" className="hover:text-(--ink)">Staff sign in</Link>
         </nav>
       </header>
@@ -73,10 +73,10 @@ export default function LandingPage() {
                 See the pack
               </a>
               <a
-                href="#stockists"
-                className="text-[15px] underline decoration-(--lilac) underline-offset-[6px] hover:decoration-(--plum)"
+                href="#super-dealers"
+                className="inline-flex h-12 items-center rounded-full border border-(--plum) px-7 text-[15px] text-(--plum) transition-colors hover:bg-(--mist) focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--plum)"
               >
-                Stock Tausi in your shop
+                Become a super dealer
               </a>
             </div>
           </div>
@@ -85,7 +85,6 @@ export default function LandingPage() {
             <div className="relative">
               <PackSpinner />
             </div>
-            <p className="relative mt-6 text-sm text-(--muted)">Drag to turn it</p>
           </div>
         </section>
 
@@ -143,21 +142,21 @@ export default function LandingPage() {
           </p>
         </section>
 
-        <section id="stockists" className="scroll-mt-8 bg-(--plum) text-white">
+        <section id="super-dealers" className="scroll-mt-8 bg-(--plum) text-white">
           <div className="mx-auto grid w-full max-w-6xl gap-12 px-6 py-28 md:grid-cols-[7fr_5fr] md:items-end md:py-36">
             <div>
               <h2 className="font-(family-name:--font-bodoni) text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-normal">
-                Stock Tausi in your shop.
+                Become a super dealer.
               </h2>
               <p className="mt-6 max-w-[44ch] text-lg leading-relaxed text-(--lilac)">
-                We supply shops, pharmacies and supermarkets through dealers in
-                every zone. Tell us where you are, and a salesperson will visit
-                with stock.
+                Super dealers supply Tausi to shops, pharmacies and supermarkets
+                in their zone. Tell us where you are, and our sales team will
+                get in touch.
               </p>
             </div>
             <div className="md:justify-self-end">
               <a
-                href={`mailto:${SALES_EMAIL}?subject=Stocking%20Tausi`}
+                href={`mailto:${SALES_EMAIL}?subject=Becoming%20a%20Tausi%20super%20dealer`}
                 className="inline-flex h-12 items-center rounded-full bg-white px-7 text-[15px] text-(--plum) transition-colors hover:bg-(--mist) focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
               >
                 Email the sales team
