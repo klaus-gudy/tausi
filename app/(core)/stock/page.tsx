@@ -63,8 +63,8 @@ export default function StockPage({ searchParams }: PageProps<"/stock">) {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Stock in &amp; out</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Stock in &amp; out</h1>
+        <p className="text-sm text-muted-foreground">
           Record stock received from suppliers and issued to super dealers, warehouse by warehouse.
         </p>
       </div>
