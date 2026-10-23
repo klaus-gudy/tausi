@@ -6,7 +6,7 @@ import { LocateFixed } from "lucide-react";
 import { toast } from "sonner";
 
 import { onboardSuperDealer, type OnboardResult } from "../actions";
-import { PlaceFields } from "../dealer-dialog";
+import { PlaceFields } from "@/components/place-fields";
 import { SignaturePad } from "@/components/signature-pad";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -182,7 +182,7 @@ export function OnboardForm({
             <FieldLegend>Location</FieldLegend>
             <FieldGroup>
               <div className="grid gap-5 sm:grid-cols-3">
-                <PlaceFields places={places} regionKey={null} districtKey={null} />
+                <PlaceFields places={places} regionKey={null} districtKey={null} idPrefix="onboard" />
               </div>
               <Field>
                 <FieldLabel htmlFor="onboard-address">Street, area or landmark</FieldLabel>
