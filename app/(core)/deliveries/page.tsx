@@ -50,8 +50,8 @@ export default function DeliveriesPage({ searchParams }: PageProps<"/deliveries"
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Deliveries</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Deliveries</h1>
+        <p className="text-sm text-muted-foreground">
           Stock salespeople receive from the store and supply to super dealers.
         </p>
       </div>
