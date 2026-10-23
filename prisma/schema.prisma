@@ -384,9 +384,6 @@ model Warehouse {
   districtKey    String?   @map("district_key")
   // Street, area or landmark within the district.
   address        String?
-  // An estimate, in capacityUnit; see lib/warehouses.ts for the units.
-  capacity       Int?
-  capacityUnit   String    @default("units") @map("capacity_unit")
   // The storekeeper or manager to call.
   contactName    String?   @map("contact_name")
   // Stored as +255754123456; see lib/dealers.ts.
