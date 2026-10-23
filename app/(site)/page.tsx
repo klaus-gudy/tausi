@@ -31,7 +31,6 @@ export default function LandingPage() {
           <a href="#why" className="hidden hover:text-(--ink) sm:inline">Why us</a>
           <a href="#pack" className="hidden hover:text-(--ink) sm:inline">The pack</a>
           <a href="#super-dealers" className="hidden hover:text-(--ink) sm:inline">Super dealers</a>
-          <Link href="/login" className="hover:text-(--ink)">Staff sign in</Link>
         </nav>
       </header>
 
