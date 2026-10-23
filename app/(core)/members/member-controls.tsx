@@ -1,58 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { MoreHorizontal } from "lucide-react";
-import { toast } from "sonner";
 
-import { changeMemberRole, removeMember, revokeInvitation } from "./actions";
+import { removeMember, revokeInvitation } from "./actions";
+import { EditMemberDialog, type EditableMember } from "./edit-member-dialog";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-
-type Role = { id: string; name: string };
-
-export function RoleSelect({
-  membershipId,
-  roleId,
-  roles,
-  label,
-}: {
-  membershipId: string;
-  roleId: string;
-  roles: Role[];
-  label: string;
-}) {
-  const [pending, startTransition] = useTransition();
-
-  return (
-    <NativeSelect
-      size="sm"
-      aria-label={label}
-      value={roleId}
-      disabled={pending}
-      onChange={(event) => {
-        const next = event.target.value;
-        startTransition(async () => {
-          const result = await changeMemberRole(membershipId, next);
-          if (result.success) toast.success(result.message);
-          else toast.error(result.message);
-        });
-      }}
-    >
-      {roles.map((role) => (
-        <NativeSelectOption key={role.id} value={role.id}>
-          {role.name}
-        </NativeSelectOption>
-      ))}
-    </NativeSelect>
-  );
-}
 
 /** A "…" menu with one destructive action, confirmed before it runs. */
 function RowMenu({
@@ -101,37 +62,72 @@ function RowMenu({
   );
 }
 
-export function RemoveMemberMenu({
-  membershipId,
-  name,
+/** A member's "…" menu: edit them, and remove them (or leave, on your own row). */
+export function MemberMenu({
+  member,
+  roles,
+  editable,
+  roleEditable,
+  removable,
   organizationName,
   self,
 }: {
-  membershipId: string;
-  name: string;
+  member: EditableMember;
+  roles: { id: string; name: string }[];
+  editable: boolean;
+  roleEditable: boolean;
+  removable: boolean;
   organizationName: string;
   self: boolean;
 }) {
-  return self ? (
-    <RowMenu
-      label="Your membership options"
-      itemLabel="Leave organization"
-      title={`Leave ${organizationName}?`}
-      description="You'll lose access until someone invites you again."
-      confirmLabel="Leave"
-      pendingLabel="Leaving…"
-      action={() => removeMember(membershipId)}
-    />
-  ) : (
-    <RowMenu
-      label={`Options for ${name}`}
-      itemLabel="Remove from organization"
-      title={`Remove ${name}?`}
-      description={`They'll lose access to ${organizationName} until invited again.`}
-      confirmLabel="Remove"
-      pendingLabel="Removing…"
-      action={() => removeMember(membershipId)}
-    />
+  const [editing, setEditing] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={self ? "Your membership options" : `Options for ${member.name}`}
+          >
+            <MoreHorizontal />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {editable ? <DropdownMenuItem onSelect={() => setEditing(true)}>Edit</DropdownMenuItem> : null}
+          {editable && removable ? <DropdownMenuSeparator /> : null}
+          {removable ? (
+            <DropdownMenuItem variant="destructive" onSelect={() => setRemoving(true)}>
+              {self ? "Leave organization" : "Remove from organization"}
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {editable ? (
+        <EditMemberDialog
+          member={member}
+          roles={roles}
+          roleEditable={roleEditable}
+          open={editing}
+          onOpenChange={setEditing}
+        />
+      ) : null}
+      <ConfirmDeleteDialog
+        open={removing}
+        onOpenChange={setRemoving}
+        title={self ? `Leave ${organizationName}?` : `Remove ${member.name}?`}
+        description={
+          self
+            ? "You'll lose access until someone invites you again."
+            : `They'll lose access to ${organizationName} until invited again.`
+        }
+        confirmLabel={self ? "Leave" : "Remove"}
+        pendingLabel={self ? "Leaving…" : "Removing…"}
+        action={() => removeMember(member.id)}
+      />
+    </>
   );
 }
 
