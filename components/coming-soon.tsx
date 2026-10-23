@@ -22,8 +22,8 @@ export function ComingSoon({
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <p className="text-muted-foreground">{description}</p>
+        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <Empty className="border">
         <EmptyHeader>
