@@ -40,8 +40,8 @@ export default function SalespeoplePage({ searchParams }: PageProps<"/salespeopl
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Salespeople</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Salespeople</h1>
+        <p className="text-sm text-muted-foreground">
           Who covers which zone, the stock they hold and what they supplied.
         </p>
       </div>
