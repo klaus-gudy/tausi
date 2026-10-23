@@ -73,12 +73,12 @@ export default function LandingPage() {
         <WhyUs />
 
         {/* The Premium pack: sizes first, then what comes in it. */}
-        <section id="pack" className="scroll-mt-8 bg-(--mist) py-32 md:py-44">
+        <section id="pack" className="scroll-mt-8 bg-(--mist) py-20 md:py-24">
           <div className="mx-auto w-full max-w-6xl px-6">
             <h2 className="max-w-[18ch] font-(family-name:--font-bodoni) text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-normal">
               The Premium pack.
             </h2>
-            <dl className="mt-16 grid gap-12 md:grid-cols-3 md:gap-10">
+            <dl className="mt-12 grid gap-12 md:grid-cols-3 md:gap-10">
               {PACK.map((item) => (
                 <div key={item.value} className="border-t border-(--lilac) pt-6">
                   <dt className="font-(family-name:--font-bodoni) text-3xl">{item.value}</dt>
@@ -90,9 +90,9 @@ export default function LandingPage() {
         </section>
 
         {/* The brand line, given room. */}
-        <section className="mx-auto flex w-full max-w-3xl flex-col items-center px-6 py-36 text-center md:py-52">
-          <Emblem className="w-28 bg-(--lilac)" />
-          <p className="mt-10 font-(family-name:--font-bodoni) text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.1]">
+        <section className="mx-auto flex w-full max-w-3xl flex-col items-center px-6 py-20 text-center md:py-24">
+          <Emblem className="w-24 bg-(--lilac)" />
+          <p className="mt-8 font-(family-name:--font-bodoni) text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.1]">
             Beauty from within.
           </p>
           <p className="mt-6 max-w-[42ch] text-lg leading-relaxed text-(--muted)">
