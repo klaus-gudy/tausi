@@ -44,8 +44,8 @@ export default function MembersPage() {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Members</h1>
+        <p className=\"text-sm text-muted-foreground\">
           Who&apos;s in your organization, and who&apos;s been invited.
         </p>
       </div>
