@@ -166,11 +166,31 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-12 text-sm text-(--muted) sm:flex-row sm:items-center sm:justify-between">
+      <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-6 text-sm text-(--muted)">
         <span className="pl-[0.35em] font-(family-name:--font-cinzel) tracking-[0.35em] text-(--ink)">TAUSI</span>
         <span>© 2026 Tausi</span>
-        <Link href="/login" className="hover:text-(--ink)">Staff sign in</Link>
+        <span className="flex items-center gap-2">
+          <TanzaniaFlag />
+          Tanzania
+        </span>
       </footer>
     </>
+  );
+}
+
+// The flag of Tanzania: green and blue split by a black diagonal edged in gold.
+function TanzaniaFlag() {
+  return (
+    <svg viewBox="0 0 72 48" className="h-4 w-6 rounded-[2px]" aria-hidden>
+      <clipPath id="tz-flag">
+        <rect width="72" height="48" />
+      </clipPath>
+      <g clipPath="url(#tz-flag)">
+        <path d="M0 0h72L0 48z" fill="#1EB53A" />
+        <path d="M72 0v48H0z" fill="#00A3DD" />
+        <path d="M0 48L72 0" stroke="#FCD116" strokeWidth="19" />
+        <path d="M0 48L72 0" stroke="#000" strokeWidth="13" />
+      </g>
+    </svg>
   );
 }
