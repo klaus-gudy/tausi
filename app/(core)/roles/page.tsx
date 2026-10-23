@@ -30,8 +30,8 @@ export default function RolesPage() {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Roles & permissions</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Roles & permissions</h1>
+        <p className=\"text-sm text-muted-foreground\">
           Open a role to see and set what it can do. Give members a role on the Members page.
         </p>
       </div>
