@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Emblem } from "@/components/landing/emblem";
-import { PadSpinner } from "@/components/landing/pad-spinner";
+import { PackSpinner } from "@/components/landing/pack-spinner";
 import { PAD_WIDTH, padCore, padOutline } from "@/components/landing/pad-shape";
 
 export const metadata: Metadata = {
@@ -59,7 +59,7 @@ export default function LandingPage() {
       </header>
 
       <main>
-        {/* Hero: the pad itself, turning slowly. */}
+        {/* Hero: the pack itself, turning slowly. */}
         <section className="mx-auto grid w-full max-w-6xl items-center gap-16 px-6 pt-12 pb-24 md:min-h-[calc(100svh-5rem)] md:grid-cols-2 md:gap-8 md:pt-8">
           <div className="max-w-xl">
             <h1 className="font-(family-name:--font-bodoni) text-[clamp(2.75rem,6vw,4.75rem)] leading-[1.04] font-normal tracking-[-0.015em]">
@@ -88,7 +88,7 @@ export default function LandingPage() {
           <div className="relative flex flex-col items-center">
             <div aria-hidden className="absolute top-1/2 left-1/2 -z-0 size-[min(88vw,480px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--mist)" />
             <div className="relative">
-              <PadSpinner />
+              <PackSpinner />
             </div>
             <p className="relative mt-6 text-sm text-(--muted)">Drag to turn it</p>
           </div>
