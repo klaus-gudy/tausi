@@ -74,7 +74,7 @@ export default function LandingPage() {
         {/* The Premium pack: sizes first, then what comes in it. */}
         <section id="pack" className="scroll-mt-8 bg-(--mist) py-20 md:py-24">
           <div className="mx-auto w-full max-w-6xl px-6">
-            <h2 className="max-w-[18ch] font-(family-name:--font-bodoni) text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-normal">
+            <h2 className="text-center font-(family-name:--font-bodoni) text-[clamp(2.5rem,5vw,4rem)] leading-[1.05] font-normal">
               The Premium pack.
             </h2>
             <dl className="mt-12 grid gap-12 md:grid-cols-3 md:gap-10">
