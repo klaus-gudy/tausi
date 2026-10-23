@@ -7,7 +7,7 @@ import { useEffect, useState } from "react"
 import { AbsorbScene, AnionScene, BagScene, FeatherScene } from "./why-us-scenes"
 
 // Why us as a carousel on a deep aubergine band, one reason at a time so the
-// section stays one screen tall. A glowing stage plays the reason's scene
+// section stays short. A glowing stage plays the reason's scene
 // while its numeral, title and text slide in; the numeral fills with colour
 // from the bottom up, the way the pad draws fluid in. Each reason takes one of
 // the peacock's feather colours. It moves on by itself, pauses while the
@@ -77,25 +77,21 @@ export function WhyUs() {
         onFocus={() => setPaused(true)}
         onBlur={() => setPaused(false)}
       >
-        {/* Phones read heading, stage, slide; wide screens put the stage beside both. */}
-        <div className="mx-auto grid w-full max-w-6xl content-center gap-x-16 gap-y-12 px-6 py-24 md:min-h-svh md:grid-cols-2 md:py-20">
-          <div className="order-2 md:order-none md:col-start-1 md:row-span-2 md:row-start-1 md:self-center">
-            <Stage active={active} accent={reason.accent} Scene={reason.Scene} />
-          </div>
-
-          <div className="order-1 md:order-none md:col-start-2 md:self-end">
+        <div className="mx-auto w-full max-w-6xl px-6 py-20 md:py-24">
+          <div className="text-center">
             <h2 className="font-(family-name:--font-bodoni) text-[clamp(2.5rem,5vw,4rem)] leading-[1.05] font-normal">
               Why us.
             </h2>
-            <p className="mt-4 max-w-[38ch] text-lg leading-relaxed text-(--lilac)">
+            <p className="mx-auto mt-4 max-w-[38ch] text-lg leading-relaxed text-(--lilac)">
               Four things every Tausi pad is made to do for you.
             </p>
           </div>
 
-          <div className="order-3 flex flex-col md:order-none md:col-start-2 md:self-start">
-            {/* The slide: swipe it sideways on touch screens. */}
+          <div className="mt-12 grid items-center gap-10 md:mt-14 md:grid-cols-2 md:gap-16">
+            <Stage active={active} accent={reason.accent} Scene={reason.Scene} />
+
             <motion.div
-              className="relative min-h-[19rem] touch-pan-y sm:min-h-[17rem]"
+              className="relative min-h-[18rem] touch-pan-y sm:min-h-[15rem]"
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.2}
@@ -130,43 +126,42 @@ export function WhyUs() {
                 </motion.div>
               </AnimatePresence>
             </motion.div>
+          </div>
 
-            <div className="mt-8 flex items-center justify-between gap-6">
-              <div className="flex gap-2">
-                {REASONS.map((item, index) => (
-                  <button
-                    key={item.name}
-                    type="button"
-                    onClick={() => show(index)}
-                    aria-label={`Show reason ${index + 1}: ${item.name}`}
-                    aria-current={index === active}
-                    className="group flex h-6 items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                  >
-                    <span className="relative block h-0.5 w-10 overflow-hidden rounded-full bg-white/15 group-hover:bg-white/30">
-                      {/* The active bar fills over the time before the next slide. */}
-                      {index === active && (
-                        <motion.span
-                          key={`${active}-${autoplay}`}
-                          className="absolute inset-0 origin-left"
-                          style={{ backgroundColor: item.accent }}
-                          initial={{ scaleX: autoplay ? 0 : 1 }}
-                          animate={{ scaleX: 1 }}
-                          transition={{ duration: autoplay ? SLIDE_MS / 1000 : 0, ease: "linear" }}
-                        />
-                      )}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-3">
-                <StepButton label="Previous reason" onClick={() => go(-1)}>
-                  <ArrowLeft className="size-4" aria-hidden />
-                </StepButton>
-                <StepButton label="Next reason" onClick={() => go(1)}>
-                  <ArrowRight className="size-4" aria-hidden />
-                </StepButton>
-              </div>
+          {/* Faint arrows either side of the four progress bars. */}
+          <div className="mt-10 flex items-center justify-center gap-5">
+            <StepButton label="Previous reason" onClick={() => go(-1)}>
+              <ArrowLeft className="size-4" aria-hidden />
+            </StepButton>
+            <div className="flex gap-2">
+              {REASONS.map((item, index) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => show(index)}
+                  aria-label={`Show reason ${index + 1}: ${item.name}`}
+                  aria-current={index === active}
+                  className="group flex h-6 items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                >
+                  <span className="relative block h-0.5 w-10 overflow-hidden rounded-full bg-white/15 group-hover:bg-white/30">
+                    {/* The active bar fills over the time before the next slide. */}
+                    {index === active && (
+                      <motion.span
+                        key={`${active}-${autoplay}`}
+                        className="absolute inset-0 origin-left"
+                        style={{ backgroundColor: item.accent }}
+                        initial={{ scaleX: autoplay ? 0 : 1 }}
+                        animate={{ scaleX: 1 }}
+                        transition={{ duration: autoplay ? SLIDE_MS / 1000 : 0, ease: "linear" }}
+                      />
+                    )}
+                  </span>
+                </button>
+              ))}
             </div>
+            <StepButton label="Next reason" onClick={() => go(1)}>
+              <ArrowRight className="size-4" aria-hidden />
+            </StepButton>
           </div>
         </div>
       </section>
@@ -186,7 +181,7 @@ function Stage({
 }) {
   return (
     <div aria-hidden className="flex justify-center">
-      <div className="relative flex size-[min(64vw,22rem)] items-center justify-center rounded-full md:size-[min(30rem,40vw)]">
+      <div className="relative flex size-[min(64vw,20rem)] items-center justify-center rounded-full md:size-[min(24rem,36vw)]">
         <motion.div
           className="absolute inset-0 rounded-full"
           animate={{ background: `radial-gradient(closest-side, ${accent}40, ${accent}10 60%, transparent)` }}
@@ -254,7 +249,7 @@ function StepButton({ label, onClick, children }: { label: string; onClick: () =
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="flex size-11 items-center justify-center rounded-full border border-white/25 text-white transition-colors hover:border-white/60 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      className="flex size-10 items-center justify-center rounded-full border border-white/10 text-white/40 transition-colors hover:border-white/30 hover:text-white/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
     >
       {children}
     </button>
