@@ -5,6 +5,7 @@ import { Suspense } from "react";
 
 import { readPermissionChoices } from "./data";
 import { NewRoleDialog } from "./new-role-dialog";
+import { BadgeOverflow } from "@/components/badge-overflow";
 import { NoAccessState } from "@/components/no-access-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,27 +93,29 @@ async function Roles() {
                     {description}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="mt-auto flex flex-wrap gap-1">
+                <CardContent className="mt-auto">
                   {touched.length ? (
-                    touched.map((group) => {
-                      // Filled when the role has the whole module, dashed when only part.
-                      const full = group.permissions.every((p) => keys.has(p.key));
-                      return (
-                        <Badge
-                          key={group.key}
-                          variant="outline"
-                          title={full ? "Full access" : "Some access"}
-                          className={
-                            full
-                              ? "h-5 border-primary/30 bg-primary/10 px-1.5 text-[11px] text-primary"
-                              : "h-5 border-dashed px-1.5 text-[11px] text-muted-foreground"
-                          }
-                        >
-                          {group.label}
-                          <span className="sr-only">{full ? ", full access" : ", some access"}</span>
-                        </Badge>
-                      );
-                    })
+                    <BadgeOverflow>
+                      {touched.map((group) => {
+                        // Filled when the role has the whole module, dashed when only part.
+                        const full = group.permissions.every((p) => keys.has(p.key));
+                        return (
+                          <Badge
+                            key={group.key}
+                            variant="outline"
+                            title={full ? "Full access" : "Some access"}
+                            className={
+                              full
+                                ? "h-5 border-primary/30 bg-primary/10 px-1.5 text-[11px] text-primary"
+                                : "h-5 border-dashed px-1.5 text-[11px] text-muted-foreground"
+                            }
+                          >
+                            {group.label}
+                            <span className="sr-only">{full ? ", full access" : ", some access"}</span>
+                          </Badge>
+                        );
+                      })}
+                    </BadgeOverflow>
                   ) : (
                     <span className="text-xs text-muted-foreground">No permissions yet</span>
                   )}
