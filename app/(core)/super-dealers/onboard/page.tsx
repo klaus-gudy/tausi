@@ -16,8 +16,8 @@ export default function OnboardDealerPage() {
   return (
     <div className="mx-auto grid w-full max-w-2xl gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Onboard a super dealer</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Onboard a super dealer</h1>
+        <p className="text-sm text-muted-foreground">
           Take the dealer&apos;s details in their shop and have them sign.
         </p>
       </div>
