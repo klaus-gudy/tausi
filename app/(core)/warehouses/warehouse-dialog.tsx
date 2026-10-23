@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { MapPin, Plus, UserRound, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 
 import { saveWarehouse } from "./actions";
+import { FormSection } from "@/components/form-section";
+import { PlaceFields } from "@/components/place-fields";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,7 +50,7 @@ export type Keeper = { id: string; name: string; phone: string | null; role: str
 
 const initialState: ActionResult = { message: "" };
 
-// Radix Select items can't have an empty value, so "nothing picked" is this.
+// Radix Select items can't have an empty value, so "no storekeeper" is this.
 const NONE = "none";
 // The storekeeper saved before, when they aren't one of the members.
 const SAVED = "saved";
@@ -121,12 +123,6 @@ function WarehouseForm({
   keepers: Keeper[];
   onSaved: () => void;
 }) {
-  // The zone isn't stored; it only narrows the region list.
-  const [zoneKey, setZoneKey] = useState(
-    () => places.find((zone) => zone.regions.some((region) => region.key === warehouse?.regionKey))?.key ?? ""
-  );
-  const [regionKey, setRegionKey] = useState(warehouse?.regionKey ?? "");
-  const [districtKey, setDistrictKey] = useState(warehouse?.districtKey ?? "");
   // The storekeeper is picked from the members, which fills in their name and
   // phone; the phone can still be changed for this warehouse.
   const savedName = warehouse?.contactName ?? "";
@@ -146,8 +142,6 @@ function WarehouseForm({
     initialState
   );
 
-  const zone = places.find((zone) => zone.key === zoneKey);
-  const region = zone?.regions.find((region) => region.key === regionKey);
   const keeperName =
     keeper === SAVED ? savedName : (keepers.find((k) => k.id === keeper)?.name ?? "");
 
@@ -159,147 +153,93 @@ function WarehouseForm({
       </DialogHeader>
       {warehouse ? <input type="hidden" name="id" value={warehouse.id} /> : null}
       <input type="hidden" name="contactName" value={keeperName} />
-      <input type="hidden" name="regionKey" value={regionKey} />
-      <input type="hidden" name="districtKey" value={districtKey} />
       <FieldGroup className="gap-4 py-4">
-        <Field>
-          <FieldLabel htmlFor="warehouse-name">Name</FieldLabel>
-          <Input
-            id="warehouse-name"
-            name="name"
-            defaultValue={warehouse?.name ?? ""}
-            placeholder="Mikocheni main store"
-            autoComplete="off"
-            maxLength={200}
-            required
-          />
-        </Field>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <FormSection icon={Warehouse} title="Warehouse" description="What you call this store or depot.">
           <Field>
-            <FieldLabel htmlFor="warehouse-keeper">
-              Storekeeper <span className="font-normal text-muted-foreground">(optional)</span>
-            </FieldLabel>
-            <Select
-              value={keeper}
-              onValueChange={(next) => {
-                setKeeper(next);
-                const picked = keepers.find((k) => k.id === next);
-                if (picked) setPhone(picked.phone ? formatPhone(picked.phone) : "");
-                if (next === NONE) setPhone("");
-              }}
-            >
-              <SelectTrigger id="warehouse-keeper" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>No storekeeper</SelectItem>
-                {savedName && !keepers.some((k) => k.name === savedName) ? (
-                  <SelectItem value={SAVED}>{savedName}</SelectItem>
-                ) : null}
-                {keepers.map((k) => (
-                  <SelectItem key={k.id} value={k.id}>
-                    {k.name}
-                    <span className="text-muted-foreground">· {k.role}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="warehouse-phone">
-              Phone <span className="font-normal text-muted-foreground">(optional)</span>
-            </FieldLabel>
+            <FieldLabel htmlFor="warehouse-name">Name</FieldLabel>
             <Input
-              id="warehouse-phone"
-              name="phone"
-              type="tel"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder="0754 123 456"
+              id="warehouse-name"
+              name="name"
+              defaultValue={warehouse?.name ?? ""}
+              placeholder="Mikocheni main store"
               autoComplete="off"
-              maxLength={40}
+              maxLength={200}
+              required
             />
           </Field>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        </FormSection>
+        <FormSection icon={UserRound} title="Storekeeper" description="Pick a member; their phone is filled in for you.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="warehouse-keeper">
+                Member <span className="font-normal text-muted-foreground">(optional)</span>
+              </FieldLabel>
+              <Select
+                value={keeper}
+                onValueChange={(next) => {
+                  setKeeper(next);
+                  const picked = keepers.find((k) => k.id === next);
+                  if (picked) setPhone(picked.phone ? formatPhone(picked.phone) : "");
+                  if (next === NONE) setPhone("");
+                }}
+              >
+                <SelectTrigger id="warehouse-keeper" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>No storekeeper</SelectItem>
+                  {savedName && !keepers.some((k) => k.name === savedName) ? (
+                    <SelectItem value={SAVED}>{savedName}</SelectItem>
+                  ) : null}
+                  {keepers.map((k) => (
+                    <SelectItem key={k.id} value={k.id}>
+                      {k.name}
+                      <span className="text-muted-foreground">· {k.role}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="warehouse-phone">
+                Phone <span className="font-normal text-muted-foreground">(optional)</span>
+              </FieldLabel>
+              <Input
+                id="warehouse-phone"
+                name="phone"
+                type="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="0754 123 456"
+                autoComplete="off"
+                maxLength={40}
+              />
+            </Field>
+          </div>
+        </FormSection>
+        <FormSection icon={MapPin} title="Location" description="Where it is, so stock can be planned by zone.">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <PlaceFields
+              places={places}
+              regionKey={warehouse?.regionKey ?? null}
+              districtKey={warehouse?.districtKey ?? null}
+              idPrefix="warehouse"
+            />
+          </div>
           <Field>
-            <FieldLabel htmlFor="warehouse-zone">Zone</FieldLabel>
-            <Select
-              value={zoneKey || NONE}
-              onValueChange={(next) => {
-                setZoneKey(next === NONE ? "" : next);
-                setRegionKey("");
-                setDistrictKey("");
-              }}
-            >
-              <SelectTrigger id="warehouse-zone" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>No zone</SelectItem>
-                {places.map((zone) => (
-                  <SelectItem key={zone.key} value={zone.key}>
-                    {zone.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FieldLabel htmlFor="warehouse-address">
+              Address <span className="font-normal text-muted-foreground">(optional)</span>
+            </FieldLabel>
+            <Input
+              id="warehouse-address"
+              name="address"
+              defaultValue={warehouse?.address ?? ""}
+              placeholder="Plot 12, Nyerere Road, near the Tazara junction"
+              autoComplete="off"
+              maxLength={300}
+            />
           </Field>
-          <Field>
-            <FieldLabel htmlFor="warehouse-region">Region</FieldLabel>
-            <Select
-              value={regionKey || NONE}
-              onValueChange={(next) => {
-                setRegionKey(next === NONE ? "" : next);
-                setDistrictKey("");
-              }}
-              disabled={!zone}
-            >
-              <SelectTrigger id="warehouse-region" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>{zone ? "No region" : "Pick a zone first"}</SelectItem>
-                {zone?.regions.map((region) => (
-                  <SelectItem key={region.key} value={region.key}>
-                    {region.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="warehouse-district">District</FieldLabel>
-            <Select
-              value={districtKey || NONE}
-              onValueChange={(next) => setDistrictKey(next === NONE ? "" : next)}
-              disabled={!region}
-            >
-              <SelectTrigger id="warehouse-district" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>{region ? "No district" : "Pick a region first"}</SelectItem>
-                {region?.districts.map((district) => (
-                  <SelectItem key={district.key} value={district.key}>
-                    {district.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-        <Field>
-          <FieldLabel htmlFor="warehouse-address">Address</FieldLabel>
-          <Input
-            id="warehouse-address"
-            name="address"
-            defaultValue={warehouse?.address ?? ""}
-            placeholder="Plot 12, Nyerere Road, near the Tazara junction"
-            autoComplete="off"
-            maxLength={300}
-          />
-        </Field>
+        </FormSection>
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
