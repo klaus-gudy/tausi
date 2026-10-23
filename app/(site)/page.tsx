@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Emblem } from "@/components/landing/emblem";
 import { PackSpinner } from "@/components/landing/pack-spinner";
+import { WhyUs } from "@/components/landing/why-us";
 
 export const metadata: Metadata = {
   title: "Tausi Premium pads",
@@ -11,25 +12,6 @@ export const metadata: Metadata = {
 
 // Placeholder: replace with the sales team's real address before launch.
 const SALES_EMAIL = "sales@example.com";
-
-const REASONS = [
-  {
-    name: "Discreet disposal (vifuko)",
-    text: "Every pack comes with sanitary bags, so you can wrap a used pad and throw it away without anyone seeing.",
-  },
-  {
-    name: "Anion chip protection",
-    text: "An anion chip in each pad helps keep odour away, so you stay fresh all day.",
-  },
-  {
-    name: "High absorbency and dryness",
-    text: "The core draws fluid in fast and locks it away, so the surface stays dry against your skin.",
-  },
-  {
-    name: "Gentle on skin",
-    text: "A soft, breathable top sheet that is kind to skin, even on long days.",
-  },
-];
 
 const PACK = [
   { value: "340 mm", text: "Long enough for heavy days." },
@@ -88,30 +70,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Why us: four reasons, numbered as the brief lists them. */}
-        <section id="why" className="mx-auto grid w-full max-w-6xl scroll-mt-8 gap-16 px-6 py-32 md:grid-cols-[5fr_7fr] md:py-44">
-          <div>
-            <h2 className="font-(family-name:--font-bodoni) text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-normal">
-              Why us.
-            </h2>
-            <p className="mt-6 max-w-[34ch] text-lg leading-relaxed text-(--muted)">
-              Four things every Tausi pad is made to do for you.
-            </p>
-          </div>
-          <ol className="flex flex-col gap-14">
-            {REASONS.map((reason, index) => (
-              <li key={reason.name} className="grid grid-cols-[3rem_1fr] items-baseline gap-6">
-                <span aria-hidden className="font-(family-name:--font-bodoni) text-4xl text-(--orchid)">
-                  {index + 1}
-                </span>
-                <div>
-                  <h3 className="font-(family-name:--font-bodoni) text-2xl font-normal">{reason.name}</h3>
-                  <p className="mt-2 max-w-[44ch] leading-relaxed text-(--muted)">{reason.text}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
+        <WhyUs />
 
         {/* The Premium pack: both lengths and the pack size. */}
         <section id="pack" className="scroll-mt-8 bg-(--mist) py-32 md:py-44">
