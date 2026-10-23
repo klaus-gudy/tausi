@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -25,11 +24,16 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useFormAction } from "@/hooks/use-form-action";
 import { formatPhone, type PlaceZone } from "@/lib/dealers";
 import type { ActionResult } from "@/lib/inventory";
-import { CAPACITY_UNITS } from "@/lib/warehouses";
 
 export type EditableWarehouse = {
   id: string;
@@ -37,16 +41,22 @@ export type EditableWarehouse = {
   regionKey: string | null;
   districtKey: string | null;
   address: string | null;
-  capacity: number | null;
-  capacityUnit: string;
   contactName: string | null;
   phone: string | null;
 };
 
+/** A member who can be picked as a warehouse's storekeeper. */
+export type Keeper = { id: string; name: string; phone: string | null; role: string };
+
 const initialState: ActionResult = { message: "" };
 
+// Radix Select items can't have an empty value, so "nothing picked" is this.
+const NONE = "none";
+// The storekeeper saved before, when they aren't one of the members.
+const SAVED = "saved";
+
 /** The "Add warehouse" button and its dialog. */
-export function AddWarehouseDialog({ places }: { places: PlaceZone[] }) {
+export function AddWarehouseDialog({ places, keepers }: { places: PlaceZone[]; keepers: Keeper[] }) {
   const [open, setOpen] = useState(false);
   // Remounting the form clears it for the next warehouse.
   const [formKey, setFormKey] = useState(0);
@@ -66,7 +76,7 @@ export function AddWarehouseDialog({ places }: { places: PlaceZone[] }) {
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
-        <WarehouseForm key={formKey} places={places} onSaved={() => setOpen(false)} />
+        <WarehouseForm key={formKey} places={places} keepers={keepers} onSaved={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );
@@ -76,11 +86,13 @@ export function AddWarehouseDialog({ places }: { places: PlaceZone[] }) {
 export function EditWarehouseDialog({
   warehouse,
   places,
+  keepers,
   open,
   onOpenChange,
 }: {
   warehouse: EditableWarehouse;
   places: PlaceZone[];
+  keepers: Keeper[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -88,7 +100,12 @@ export function EditWarehouseDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
         {open ? (
-          <WarehouseForm warehouse={warehouse} places={places} onSaved={() => onOpenChange(false)} />
+          <WarehouseForm
+            warehouse={warehouse}
+            places={places}
+            keepers={keepers}
+            onSaved={() => onOpenChange(false)}
+          />
         ) : null}
       </DialogContent>
     </Dialog>
@@ -98,10 +115,12 @@ export function EditWarehouseDialog({
 function WarehouseForm({
   warehouse,
   places,
+  keepers,
   onSaved,
 }: {
   warehouse?: EditableWarehouse;
   places: PlaceZone[];
+  keepers: Keeper[];
   onSaved: () => void;
 }) {
   // The zone isn't stored; it only narrows the region list.
@@ -109,6 +128,14 @@ function WarehouseForm({
     () => places.find((zone) => zone.regions.some((region) => region.key === warehouse?.regionKey))?.key ?? ""
   );
   const [regionKey, setRegionKey] = useState(warehouse?.regionKey ?? "");
+  const [districtKey, setDistrictKey] = useState(warehouse?.districtKey ?? "");
+  // The storekeeper is picked from the members, which fills in their name and
+  // phone; the phone can still be changed for this warehouse.
+  const savedName = warehouse?.contactName ?? "";
+  const [keeper, setKeeper] = useState(() =>
+    savedName ? (keepers.find((k) => k.name === savedName)?.id ?? SAVED) : NONE
+  );
+  const [phone, setPhone] = useState(warehouse?.phone ? formatPhone(warehouse.phone) : "");
   const [state, onSubmit, pending] = useFormAction(
     async (previous: ActionResult, formData: FormData) => {
       const result = await saveWarehouse(previous, formData);
@@ -123,16 +150,19 @@ function WarehouseForm({
 
   const zone = places.find((zone) => zone.key === zoneKey);
   const region = zone?.regions.find((region) => region.key === regionKey);
+  const keeperName =
+    keeper === SAVED ? savedName : (keepers.find((k) => k.id === keeper)?.name ?? "");
 
   return (
     <form onSubmit={onSubmit}>
       <DialogHeader>
         <DialogTitle>{warehouse ? "Edit warehouse" : "Add a warehouse"}</DialogTitle>
-        <DialogDescription>
-          A store or depot where you keep stock: where it is and roughly how much it holds.
-        </DialogDescription>
+        <DialogDescription>A store or depot where you keep stock, and who looks after it.</DialogDescription>
       </DialogHeader>
       {warehouse ? <input type="hidden" name="id" value={warehouse.id} /> : null}
+      <input type="hidden" name="contactName" value={keeperName} />
+      <input type="hidden" name="regionKey" value={regionKey} />
+      <input type="hidden" name="districtKey" value={districtKey} />
       <FieldGroup className="gap-6 py-4">
         <FieldSet className="gap-3">
           <FieldLegend className="mb-0">Basic details</FieldLegend>
@@ -150,17 +180,34 @@ function WarehouseForm({
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field>
-              <FieldLabel htmlFor="warehouse-contact">
+              <FieldLabel htmlFor="warehouse-keeper">
                 Storekeeper <span className="font-normal text-muted-foreground">(optional)</span>
               </FieldLabel>
-              <Input
-                id="warehouse-contact"
-                name="contactName"
-                defaultValue={warehouse?.contactName ?? ""}
-                placeholder="Juma Hassan"
-                autoComplete="off"
-                maxLength={200}
-              />
+              <Select
+                value={keeper}
+                onValueChange={(next) => {
+                  setKeeper(next);
+                  const picked = keepers.find((k) => k.id === next);
+                  if (picked) setPhone(picked.phone ? formatPhone(picked.phone) : "");
+                  if (next === NONE) setPhone("");
+                }}
+              >
+                <SelectTrigger id="warehouse-keeper" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>No storekeeper</SelectItem>
+                  {savedName && !keepers.some((k) => k.name === savedName) ? (
+                    <SelectItem value={SAVED}>{savedName}</SelectItem>
+                  ) : null}
+                  {keepers.map((k) => (
+                    <SelectItem key={k.id} value={k.id}>
+                      {k.name}
+                      <span className="text-muted-foreground">· {k.role}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel htmlFor="warehouse-phone">
@@ -170,7 +217,8 @@ function WarehouseForm({
                 id="warehouse-phone"
                 name="phone"
                 type="tel"
-                defaultValue={warehouse?.phone ? formatPhone(warehouse.phone) : ""}
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
                 placeholder="0754 123 456"
                 autoComplete="off"
                 maxLength={40}
@@ -179,100 +227,73 @@ function WarehouseForm({
           </div>
         </FieldSet>
         <FieldSet className="gap-3">
-          <FieldLegend className="mb-0">Estimated capacity</FieldLegend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="warehouse-capacity">How much it holds</FieldLabel>
-              <Input
-                id="warehouse-capacity"
-                name="capacity"
-                inputMode="numeric"
-                defaultValue={warehouse?.capacity ?? ""}
-                placeholder="5,000"
-                autoComplete="off"
-                maxLength={20}
-              />
-              <FieldDescription>A rough figure is fine. Leave empty if unknown.</FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="warehouse-unit">Measured in</FieldLabel>
-              <NativeSelect
-                id="warehouse-unit"
-                name="capacityUnit"
-                defaultValue={warehouse?.capacityUnit ?? "units"}
-                className="w-full"
-              >
-                {CAPACITY_UNITS.map((unit) => (
-                  <NativeSelectOption key={unit.value} value={unit.value}>
-                    {unit.label}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </Field>
-          </div>
-        </FieldSet>
-        <FieldSet className="gap-3">
           <FieldLegend className="mb-0">Location</FieldLegend>
           <div className="grid gap-3 sm:grid-cols-3">
             <Field>
               <FieldLabel htmlFor="warehouse-zone">Zone</FieldLabel>
-              <NativeSelect
-                id="warehouse-zone"
-                value={zoneKey}
-                onChange={(event) => {
-                  setZoneKey(event.target.value);
+              <Select
+                value={zoneKey || NONE}
+                onValueChange={(next) => {
+                  setZoneKey(next === NONE ? "" : next);
                   setRegionKey("");
+                  setDistrictKey("");
                 }}
-                className="w-full"
               >
-                <NativeSelectOption value="">No zone</NativeSelectOption>
-                {places.map((zone) => (
-                  <NativeSelectOption key={zone.key} value={zone.key}>
-                    {zone.name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="warehouse-zone" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>No zone</SelectItem>
+                  {places.map((zone) => (
+                    <SelectItem key={zone.key} value={zone.key}>
+                      {zone.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel htmlFor="warehouse-region">Region</FieldLabel>
-              <NativeSelect
-                id="warehouse-region"
-                name="regionKey"
-                value={regionKey}
-                onChange={(event) => setRegionKey(event.target.value)}
-                className="w-full"
+              <Select
+                value={regionKey || NONE}
+                onValueChange={(next) => {
+                  setRegionKey(next === NONE ? "" : next);
+                  setDistrictKey("");
+                }}
                 disabled={!zone}
               >
-                <NativeSelectOption value="">
-                  {zone ? "No region" : "Pick a zone first"}
-                </NativeSelectOption>
-                {zone?.regions.map((region) => (
-                  <NativeSelectOption key={region.key} value={region.key}>
-                    {region.name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="warehouse-region" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>{zone ? "No region" : "Pick a zone first"}</SelectItem>
+                  {zone?.regions.map((region) => (
+                    <SelectItem key={region.key} value={region.key}>
+                      {region.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel htmlFor="warehouse-district">District</FieldLabel>
-              {/* Remounted per region so a district from another region is cleared. */}
-              <NativeSelect
-                key={regionKey}
-                id="warehouse-district"
-                name="districtKey"
-                defaultValue={regionKey === warehouse?.regionKey ? (warehouse.districtKey ?? "") : ""}
-                className="w-full"
+              <Select
+                value={districtKey || NONE}
+                onValueChange={(next) => setDistrictKey(next === NONE ? "" : next)}
                 disabled={!region}
               >
-                <NativeSelectOption value="">
-                  {region ? "No district" : "Pick a region first"}
-                </NativeSelectOption>
-                {region?.districts.map((district) => (
-                  <NativeSelectOption key={district.key} value={district.key}>
-                    {district.name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="warehouse-district" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>{region ? "No district" : "Pick a region first"}</SelectItem>
+                  {region?.districts.map((district) => (
+                    <SelectItem key={district.key} value={district.key}>
+                      {district.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           </div>
           <Field>
