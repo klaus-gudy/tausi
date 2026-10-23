@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { Emblem } from "@/components/landing/emblem";
 import { PackSpinner } from "@/components/landing/pack-spinner";
@@ -13,10 +14,9 @@ export const metadata: Metadata = {
 // Placeholder: replace with the sales team's real address before launch.
 const SALES_EMAIL = "sales@example.com";
 
-const PACK = [
-  { value: "340 mm", text: "Long enough for heavy days." },
-  { value: "390 mm", text: "Extra length for the heaviest days and overnight." },
-  { value: "9 pads", text: "Nine pads in the 340 mm pack." },
+const SIZES = [
+  { length: 340, text: "For heavy days." },
+  { length: 390, text: "For the heaviest days and overnight." },
 ];
 
 export default function LandingPage() {
@@ -72,20 +72,54 @@ export default function LandingPage() {
 
         <WhyUs />
 
-        {/* The Premium pack: both lengths and the pack size. */}
+        {/* The Premium pack: sizes first, then what comes in it. */}
         <section id="pack" className="scroll-mt-8 bg-(--mist) py-32 md:py-44">
           <div className="mx-auto w-full max-w-6xl px-6">
             <h2 className="max-w-[18ch] font-(family-name:--font-bodoni) text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-normal">
               The Premium pack.
             </h2>
-            <dl className="mt-16 grid gap-12 md:grid-cols-3 md:gap-10">
-              {PACK.map((item) => (
-                <div key={item.value} className="border-t border-(--lilac) pt-6">
-                  <dt className="font-(family-name:--font-bodoni) text-3xl">{item.value}</dt>
-                  <dd className="mt-3 max-w-[30ch] leading-relaxed text-(--muted)">{item.text}</dd>
+            <div className="mt-16 grid gap-5 md:grid-cols-[1.4fr_1fr_1fr]">
+              <article className="flex flex-col justify-between gap-12 rounded-3xl bg-white p-8 md:p-10">
+                <h3 className="text-[15px] text-(--muted)">Two sizes</h3>
+                <ul className="flex flex-col gap-8">
+                  {SIZES.map((size) => (
+                    <li key={size.length}>
+                      <p className="font-(family-name:--font-bodoni) text-4xl whitespace-nowrap">{size.length} mm</p>
+                      <p className="mt-2 text-(--muted)">{size.text}</p>
+                      {/* Drawn to scale against the longer size. */}
+                      <span
+                        aria-hidden
+                        className="mt-4 block h-1.5 rounded-full bg-(--plum)"
+                        style={{ width: `${(size.length / 390) * 100}%` }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </article>
+              <article className="flex flex-col justify-between gap-12 rounded-3xl bg-white p-8 md:p-10">
+                <span className="flex size-14 items-center justify-center rounded-full bg-(--mist) text-(--royal)">
+                  <ShoppingBag className="size-6" strokeWidth={1.5} aria-hidden />
+                </span>
+                <div>
+                  <h3 className="font-(family-name:--font-bodoni) text-4xl font-normal">Kimfuko inside</h3>
+                  <p className="mt-3 max-w-[30ch] leading-relaxed text-(--muted)">
+                    A sanitary bag comes in every pack, so disposal stays
+                    discreet.
+                  </p>
                 </div>
-              ))}
-            </dl>
+              </article>
+              <article className="flex flex-col justify-between gap-12 rounded-3xl bg-white p-8 md:p-10">
+                <span aria-hidden className="grid w-fit grid-cols-3 gap-1.5">
+                  {Array.from({ length: 9 }, (_, i) => (
+                    <span key={i} className="size-3 rounded-full bg-(--orchid)" />
+                  ))}
+                </span>
+                <div>
+                  <h3 className="font-(family-name:--font-bodoni) text-4xl font-normal">9 pads</h3>
+                  <p className="mt-3 max-w-[30ch] leading-relaxed text-(--muted)">In every pack.</p>
+                </div>
+              </article>
+            </div>
           </div>
         </section>
 
