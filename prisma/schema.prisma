@@ -223,6 +223,10 @@ model Membership {
   userId         String           @map("user_id") @db.Uuid
   roleId         String           @map("role_id") @db.Uuid
   status         MembershipStatus @default(active)
+  // How the organization knows them, set when inviting or editing a member.
+  // The name falls back to the user's own.
+  name           String?
+  phone          String?
   invitedById    String?          @map("invited_by_id") @db.Uuid
   joinedAt       DateTime         @default(now()) @map("joined_at") @db.Timestamptz
   updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -253,6 +257,9 @@ model Invitation {
   id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String           @map("organization_id") @db.Uuid
   email          String           @db.Citext
+  // Copied to the membership when the invitation is accepted.
+  name           String?
+  phone          String?
   roleId         String           @map("role_id") @db.Uuid
   // SHA-256 of the token in the invite link; the token itself is never stored.
   tokenHash      String           @unique @map("token_hash")
