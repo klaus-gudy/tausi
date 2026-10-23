@@ -2,11 +2,9 @@
 
 import { useEffect, useRef } from "react"
 
-import { Emblem } from "./emblem"
-
-// The Premium pack as a real 3D box: the pack photo on the front, a printed
-// back in the same plum, and foil-purple sides. It turns on its own; dragging
-// or the arrow keys turn it by hand.
+// The Premium pack as a real 3D box: the pack photo on the front and back,
+// and foil-purple sides. It turns on its own; dragging or the arrow keys turn
+// it by hand.
 
 const DEGREES_PER_SECOND = 26
 // Front face proportions come from the photo (1120 × 800); depth is a share
@@ -108,20 +106,12 @@ export function PackSpinner() {
             className="inset-0 bg-[url(/brand/tausi-pack-front.webp)] bg-cover bg-center"
           />
 
-          {/* Back: plum, with the peacock and wordmark. */}
+          {/* Back: the same printed face as the front. */}
           <Panel
             transform={`rotateY(180deg) translateZ(calc(var(--w) * ${DEPTH / 2}))`}
             light="var(--face)"
-            className="inset-0 flex flex-col items-center justify-center gap-[calc(var(--w)*0.03)] bg-[radial-gradient(120%_90%_at_30%_20%,#6A1A86_0%,#45065A_55%,#2A0B36_100%)]"
-          >
-            <Emblem className="w-[26%] bg-(--lilac)" />
-            <span className="pl-[0.4em] font-(family-name:--font-cinzel) text-[calc(var(--w)*0.09)] leading-none tracking-[0.4em] text-[#EDE3F0]">
-              TAUSI
-            </span>
-            <span className="text-[calc(var(--w)*0.03)] tracking-[0.12em] text-(--lilac)">
-              Beauty from within
-            </span>
-          </Panel>
+            className="inset-0 bg-[url(/brand/tausi-pack-front.webp)] bg-cover bg-center"
+          />
 
           {/* Sides: foil purple, as at the photo's edges. */}
           <Side right />
