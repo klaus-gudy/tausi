@@ -31,9 +31,9 @@ export function formatCompact(value: number) {
 }
 
 /**
- * An amount in Tanzanian shillings, the currency prices are kept in: "TSh 6,500",
- * or "TSh 4.2M" with `short`.
+ * An amount in Tanzanian shillings, the currency prices are kept in: "TZS 6,500",
+ * or "TZS 4.2M" with `short`.
  */
 export function formatMoney(value: number, short = false) {
-  return `TSh ${short ? formatCompact(value) : count.format(value)}`
+  return `TZS ${short ? formatCompact(value) : count.format(value)}`
 }
