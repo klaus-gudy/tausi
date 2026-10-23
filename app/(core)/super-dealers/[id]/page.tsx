@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowLeft, MapPin } from "lucide-react";
 
+import { DetailHeader } from "@/components/detail-header";
 import { NoAccessState } from "@/components/no-access-state";
 import { NotFoundState } from "@/components/not-found-state";
 import { Badge } from "@/components/ui/badge";
@@ -80,17 +81,15 @@ async function Dealer({ params }: Pick<PageProps<"/super-dealers/[id]">, "params
 
   return (
     <>
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{dealerName(dealer)}</h1>
-          {dealer.deactivatedAt ? <Badge variant="outline">Inactive</Badge> : null}
-        </div>
-        <p className="text-muted-foreground">
-          {dealer.onboardedBy
+      <DetailHeader
+        title={dealerName(dealer)}
+        badges={dealer.deactivatedAt ? <Badge variant="outline">Inactive</Badge> : null}
+        description={
+          dealer.onboardedBy
             ? `Onboarded by ${dealer.onboardedBy.name || dealer.onboardedBy.email} on ${formatDate(dealer.createdAt)}`
-            : `Added on ${formatDate(dealer.createdAt)}`}
-        </p>
-      </div>
+            : `Added on ${formatDate(dealer.createdAt)}`
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
