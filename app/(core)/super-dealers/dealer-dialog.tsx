@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { MapPin, Plus, Store, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { saveSuperDealer } from "./actions";
+import { FormSection } from "@/components/form-section";
+import { PlaceFields } from "@/components/place-fields";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,11 +22,8 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
-  FieldLegend,
-  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { useFormAction } from "@/hooks/use-form-action";
 import { formatPhone, type PlaceZone } from "@/lib/dealers";
 import type { ActionResult } from "@/lib/inventory";
@@ -122,32 +121,20 @@ function DealerForm({
         </DialogDescription>
       </DialogHeader>
       {dealer ? <input type="hidden" name="id" value={dealer.id} /> : null}
-      <FieldGroup className="gap-6 py-4">
-        <FieldSet className="gap-3">
-          <FieldLegend className="mb-0">Basic details</FieldLegend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="dealer-shop">Shop name</FieldLabel>
-              <Input
-                id="dealer-shop"
-                name="shopName"
-                defaultValue={dealer?.shopName ?? ""}
-                placeholder="Kariakoo General Store"
-                autoComplete="off"
-                maxLength={200}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="dealer-contact">Contact name</FieldLabel>
-              <Input
-                id="dealer-contact"
-                name="contactName"
-                defaultValue={dealer?.contactName ?? ""}
-                placeholder="Neema Mushi"
-                autoComplete="off"
-                maxLength={200}
-              />
-            </Field>
+      <FieldGroup className="gap-4 py-4">
+        <FormSection icon={UserRound} title="Contact person" description="Who to call about orders and deliveries.">
+          <Field>
+            <FieldLabel htmlFor="dealer-contact">Contact name</FieldLabel>
+            <Input
+              id="dealer-contact"
+              name="contactName"
+              defaultValue={dealer?.contactName ?? ""}
+              placeholder="Neema Mushi"
+              autoComplete="off"
+              maxLength={200}
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="dealer-phone">Phone</FieldLabel>
               <Input
@@ -175,6 +162,21 @@ function DealerForm({
                 maxLength={200}
               />
             </Field>
+          </div>
+        </FormSection>
+        <FormSection icon={Store} title="Shop" description="The business, and its registration numbers if you have them.">
+          <Field>
+            <FieldLabel htmlFor="dealer-shop">Shop name</FieldLabel>
+            <Input
+              id="dealer-shop"
+              name="shopName"
+              defaultValue={dealer?.shopName ?? ""}
+              placeholder="Kariakoo General Store"
+              autoComplete="off"
+              maxLength={200}
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="dealer-tin">
                 TIN <span className="font-normal text-muted-foreground">(optional)</span>
@@ -202,18 +204,20 @@ function DealerForm({
               />
             </Field>
           </div>
-        </FieldSet>
-        <FieldSet className="gap-3">
-          <FieldLegend className="mb-0">Location</FieldLegend>
-          <div className="grid gap-3 sm:grid-cols-3">
+        </FormSection>
+        <FormSection icon={MapPin} title="Location" description="Where the shop is, so it lands in the right zone.">
+          <div className="grid gap-4 sm:grid-cols-3">
             <PlaceFields
               places={places}
               regionKey={dealer?.regionKey ?? null}
               districtKey={dealer?.districtKey ?? null}
+              idPrefix="dealer"
             />
           </div>
           <Field>
-            <FieldLabel htmlFor="dealer-address">Address</FieldLabel>
+            <FieldLabel htmlFor="dealer-address">
+              Address <span className="font-normal text-muted-foreground">(optional)</span>
+            </FieldLabel>
             <Input
               id="dealer-address"
               name="address"
@@ -223,7 +227,7 @@ function DealerForm({
               maxLength={300}
             />
           </Field>
-        </FieldSet>
+        </FormSection>
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
@@ -232,92 +236,5 @@ function DealerForm({
         </Button>
       </DialogFooter>
     </form>
-  );
-}
-
-/**
- * Zone, region and district pickers for a dealer form, from the
- * organization's places. Submits regionKey and districtKey; the zone isn't
- * stored, it only narrows the region list. Place them in a three-column grid.
- */
-export function PlaceFields({
-  places,
-  regionKey: initialRegionKey,
-  districtKey,
-}: {
-  places: PlaceZone[];
-  regionKey: string | null;
-  districtKey: string | null;
-}) {
-  const [zoneKey, setZoneKey] = useState(
-    () => places.find((zone) => zone.regions.some((region) => region.key === initialRegionKey))?.key ?? ""
-  );
-  const [regionKey, setRegionKey] = useState(initialRegionKey ?? "");
-  const zone = places.find((zone) => zone.key === zoneKey);
-  const region = zone?.regions.find((region) => region.key === regionKey);
-
-  return (
-    <>
-      <Field>
-        <FieldLabel htmlFor="dealer-zone">Zone</FieldLabel>
-        <NativeSelect
-          id="dealer-zone"
-          value={zoneKey}
-          onChange={(event) => {
-            setZoneKey(event.target.value);
-            setRegionKey("");
-          }}
-          className="w-full"
-        >
-          <NativeSelectOption value="">No zone</NativeSelectOption>
-          {places.map((zone) => (
-            <NativeSelectOption key={zone.key} value={zone.key}>
-              {zone.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="dealer-region">Region</FieldLabel>
-        <NativeSelect
-          id="dealer-region"
-          name="regionKey"
-          value={regionKey}
-          onChange={(event) => setRegionKey(event.target.value)}
-          className="w-full"
-          disabled={!zone}
-        >
-          <NativeSelectOption value="">
-            {zone ? "No region" : "Pick a zone first"}
-          </NativeSelectOption>
-          {zone?.regions.map((region) => (
-            <NativeSelectOption key={region.key} value={region.key}>
-              {region.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="dealer-district">District</FieldLabel>
-        {/* Remounted per region so a district from another region is cleared. */}
-        <NativeSelect
-          key={regionKey}
-          id="dealer-district"
-          name="districtKey"
-          defaultValue={regionKey === initialRegionKey ? (districtKey ?? "") : ""}
-          className="w-full"
-          disabled={!region}
-        >
-          <NativeSelectOption value="">
-            {region ? "No district" : "Pick a region first"}
-          </NativeSelectOption>
-          {region?.districts.map((district) => (
-            <NativeSelectOption key={district.key} value={district.key}>
-              {district.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </Field>
-    </>
   );
 }
