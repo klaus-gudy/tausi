@@ -101,18 +101,18 @@ export default function LandingPage() {
         </section>
 
         <section id="super-dealers" className="scroll-mt-8 bg-(--plum) text-white">
-          <div className="mx-auto grid w-full max-w-6xl gap-12 px-6 py-28 md:grid-cols-[7fr_5fr] md:items-end md:py-36">
+          <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-6 py-20 text-center md:py-24">
             <div>
-              <h2 className="font-(family-name:--font-bodoni) text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-normal">
+              <h2 className="font-(family-name:--font-bodoni) text-[clamp(2.5rem,5vw,4rem)] leading-[1.05] font-normal">
                 Become a super dealer.
               </h2>
-              <p className="mt-6 max-w-[44ch] text-lg leading-relaxed text-(--lilac)">
+              <p className="mx-auto mt-6 max-w-[44ch] text-lg leading-relaxed text-(--lilac)">
                 Super dealers supply Tausi to shops, pharmacies and supermarkets
                 in their zone. Tell us where you are, and our sales team will
                 get in touch.
               </p>
             </div>
-            <div className="md:justify-self-end">
+            <div className="mt-10">
               <a
                 href={`mailto:${SALES_EMAIL}?subject=Becoming%20a%20Tausi%20super%20dealer`}
                 className="inline-flex h-12 items-center rounded-full bg-white px-7 text-[15px] text-(--plum) transition-colors hover:bg-(--mist) focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
