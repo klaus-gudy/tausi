@@ -12,6 +12,8 @@ export async function findOpenInvitation(token: string) {
     select: {
       id: true,
       email: true,
+      name: true,
+      phone: true,
       status: true,
       expiresAt: true,
       roleId: true,
@@ -43,11 +45,17 @@ export function invitationToken(path: string | null | undefined) {
 
 /**
  * Accepts an invitation for a user: marks it used and gives them the invited
- * role. Run inside a transaction. False if someone used the link first.
+ * role, name and phone. Run inside a transaction. False if someone used the link first.
  */
 export async function claimInvitation(
   tx: Prisma.TransactionClient,
-  invitation: { id: string; roleId: string; organization: { id: string } },
+  invitation: {
+    id: string
+    roleId: string
+    name: string | null
+    phone: string | null
+    organization: { id: string }
+  },
   userId: string
 ) {
   // Claim the invitation first, so a link can't be used twice at once.
@@ -63,7 +71,8 @@ export async function claimInvitation(
     select: { id: true },
   })
   if (!existing) {
-    await tx.membership.create({ data: { organizationId, userId, roleId: invitation.roleId } })
+    const { roleId, name, phone } = invitation
+    await tx.membership.create({ data: { organizationId, userId, roleId, name, phone } })
   }
   // Following the link sent to the address proves they own it.
   await tx.user.updateMany({
