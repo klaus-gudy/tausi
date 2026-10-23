@@ -39,8 +39,8 @@ export default function ProductsPage({ searchParams }: PageProps<"/products">) {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Products</h1>
+        <p className="text-sm text-muted-foreground">
           What you stock, its size and selling price, and how much is on hand.
         </p>
       </div>
