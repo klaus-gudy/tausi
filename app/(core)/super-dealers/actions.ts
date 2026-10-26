@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { dealerName, normalizePhone, normalizeTin } from "@/lib/dealers";
+import { isEmail } from "@/lib/email";
 import {
   isUniqueViolation,
   memberWith,
@@ -11,8 +12,6 @@ import {
   type ActionResult,
 } from "@/lib/inventory";
 import { getPrisma } from "@/lib/prisma";
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // The biggest signature accepted. A phone-sized pad makes 10–60 KB.
 const MAX_SIGNATURE_BYTES = 300_000;
@@ -40,7 +39,7 @@ async function readDealer(formData: FormData, organizationId: string) {
   if (!shopName && !contactName) return "Enter a shop name, a contact name, or both.";
   if (!typedPhone) return "Enter the dealer's phone number.";
   if (!phone) return "Enter a phone number like 0754 123 456.";
-  if (email && !EMAIL.test(email)) return "Enter a valid email address, or leave it empty.";
+  if (email && !isEmail(email)) return "Enter a valid email address, or leave it empty.";
   if (typedTin && !tin) return "Enter the TIN as 9 digits, like 123-456-789, or leave it empty.";
 
   // A district is only found in its own region, so finding it checks both.
