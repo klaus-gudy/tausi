@@ -44,4 +44,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 EXPOSE ${PORT}
+# /login renders without a session; busybox wget ships with the image.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget -q --spider "http://127.0.0.1:${PORT}/login" || exit 1
 CMD ["node", "server.js"]
