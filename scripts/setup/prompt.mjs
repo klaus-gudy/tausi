@@ -65,8 +65,10 @@ export function createPrompter() {
     }
   }
 
-  const label = (message, hint) =>
-    `${color.green("?")} ${color.bold(message)}${hint ? ` ${color.dim(hint)}` : ""} `
+  const label = (message, hint) => {
+    const shown = hint ? " " + color.dim(hint) : ""
+    return `${color.green("?")} ${color.bold(message)}${shown} `
+  }
 
   return {
     /** Asks until `validate` (returning an error message or undefined) accepts the answer. */
