@@ -1,5 +1,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
 import { test } from "node:test"
 
 import {
@@ -105,8 +107,8 @@ test(".env values survive a write and read, special characters included", () => 
 })
 
 test("Node reads generated .env files the way setup wrote them", () => {
-  const dir = fs.mkdtempSync(`${process.env.TMPDIR ?? "/tmp"}/setup-env-`)
-  const file = `${dir}/.env`
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "setup-env-"))
+  const file = path.join(dir, ".env")
   fs.writeFileSync(file, renderEnv(read(".env.example"), buildEnvValues(answers)))
   const env = {}
   // process.loadEnvFile only fills variables that aren't set yet.
