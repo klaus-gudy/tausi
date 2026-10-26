@@ -6,8 +6,11 @@ import { InputGroupInput } from "@/components/ui/input-group"
 
 const MAX_DIGITS = 12
 
-const withCommas = (digits: string) =>
-  digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+/** "45000" -> "45,000": a 1–3 digit head, then groups of three. */
+function withCommas(digits: string) {
+  const head = digits.length % 3 || 3
+  return [digits.slice(0, head), ...(digits.slice(head).match(/\d{3}/g) ?? [])].join(",")
+}
 
 const onlyDigits = (value: string) =>
   value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, MAX_DIGITS)
