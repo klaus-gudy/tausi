@@ -49,6 +49,21 @@ const TABS = {
 
 type Tab = keyof typeof TABS;
 
+const EMPTY: Record<Tab, { title: string; description: string }> = {
+  open: {
+    title: "No open transfers",
+    description: "Transfers being picked or on the road show up here until they arrive.",
+  },
+  arrived: {
+    title: "No arrived transfers yet",
+    description: "Transfers move here once they're marked arrived.",
+  },
+  cancelled: {
+    title: "No cancelled transfers",
+    description: "Transfers called off before they left the store.",
+  },
+};
+
 const STATUS_VARIANTS: Record<StockTransferStatus, "default" | "secondary" | "outline"> = {
   initiated: "outline",
   in_transit: "secondary",
@@ -265,18 +280,10 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                 <ArrowLeftRight />
               </EmptyMedia>
               <EmptyTitle>
-                {tab === "open"
-                  ? "No open transfers"
-                  : tab === "arrived"
-                    ? "No arrived transfers yet"
-                    : "No cancelled transfers"}
+                {EMPTY[tab].title}
               </EmptyTitle>
               <EmptyDescription>
-                {tab === "open"
-                  ? "Transfers being picked or on the road show up here until they arrive."
-                  : tab === "arrived"
-                    ? "Transfers move here once they're marked arrived."
-                    : "Transfers called off before they left the store."}
+                {EMPTY[tab].description}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
