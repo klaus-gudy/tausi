@@ -163,7 +163,8 @@ export async function lockProducts(
   warehouseId: string,
   productIds: string[]
 ) {
-  const ids = [...new Set(productIds)].sort()
+  // Code-unit order, the same on every server whatever its locale.
+  const ids = [...new Set(productIds)].sort((a, b) => Number(a > b) - Number(a < b))
   if (!ids.length) return []
   const rows = await tx.$queryRaw<{ id: string }[]>`
     SELECT id FROM products
