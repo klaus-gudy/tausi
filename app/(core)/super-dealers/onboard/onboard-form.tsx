@@ -84,6 +84,8 @@ export function OnboardForm({
     );
   }
 
+  const locateLabel = location ? "Update location" : "Use my location";
+
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
       <Card>
@@ -199,7 +201,7 @@ export function OnboardForm({
                 <div className="flex flex-wrap items-center gap-3">
                   <Button type="button" variant="outline" onClick={locate} disabled={locating}>
                     <LocateFixed data-icon="inline-start" />
-                    {locating ? "Finding you…" : location ? "Update location" : "Use my location"}
+                    {locating ? "Finding you…" : locateLabel}
                   </Button>
                   {location ? (
                     <span className="text-sm text-muted-foreground tabular-nums">
