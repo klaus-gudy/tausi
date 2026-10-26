@@ -123,6 +123,22 @@ export async function stockByWarehouse(organizationId: string) {
 }
 
 /**
+ * Units per product id that left a warehouse on a transfer the salesperson
+ * hasn't acknowledged yet: picked, on the road or arrived. A cancelled
+ * transfer's reversal brings it back to 0. Missing entries are 0.
+ */
+export async function stockInTransit(organizationId: string) {
+  const rows = await getPrisma().$queryRaw<{ product_id: string; units: bigint }[]>`
+    SELECT m.product_id, -SUM(m.quantity) AS units
+    FROM stock_transfers t
+    JOIN stock_movements m ON m.transfer_id = t.id AND m.holder = 'warehouse'
+    WHERE t.organization_id = ${organizationId}::uuid AND t.acknowledged_at IS NULL
+    GROUP BY m.product_id
+    HAVING SUM(m.quantity) <> 0`
+  return new Map(rows.map((row) => [row.product_id, Number(row.units)]))
+}
+
+/**
  * The active warehouse a stock form picked, or a message saying what's wrong
  * with the pick.
  */
