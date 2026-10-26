@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-import { MovementMenu } from "../../stock/movement-menu";
 import { BackLink } from "../back-link";
 import { receiptLines } from "../receipts";
 import { DetailHeader } from "@/components/detail-header";
@@ -75,7 +74,6 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
   if (!receipt) return <NotFoundState />;
 
   const { lines, units, value } = receiptLines(receipt.stockMovements);
-  const canReverse = member.permissions.has("stock.adjust");
   const details: [string, string][] = [
     ["Received on", formatDay(receipt.receivedOn)],
     ["Warehouse", receipt.warehouse.name],
@@ -129,11 +127,6 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
                 <TableHead className="text-right">Quantity</TableHead>
                 <TableHead className="hidden text-right sm:table-cell">Unit cost</TableHead>
                 <TableHead className="text-right">Line total</TableHead>
-                {canReverse ? (
-                  <TableHead className="w-10">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -156,16 +149,6 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
                   <TableCell className={`text-right tabular-nums ${line.reversed ? "line-through" : ""}`}>
                     {line.unitCost === null ? "—" : formatCount(line.quantity * line.unitCost)}
                   </TableCell>
-                  {canReverse ? (
-                    <TableCell>
-                      {line.reversed ? null : (
-                        <MovementMenu
-                          movementId={line.id}
-                          summary={`the receipt of ${formatCount(line.quantity)} ${line.product.name}`}
-                        />
-                      )}
-                    </TableCell>
-                  ) : null}
                 </TableRow>
               ))}
             </TableBody>
@@ -178,7 +161,6 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
                 <TableCell className="text-right font-medium tabular-nums">
                   {value === null ? "—" : formatCount(value)}
                 </TableCell>
-                {canReverse ? <TableCell /> : null}
               </TableRow>
             </TableFooter>
           </Table>
