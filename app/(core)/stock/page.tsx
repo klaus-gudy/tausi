@@ -51,6 +51,12 @@ const TYPE_NOUNS: Record<StockMovementType, string> = {
   transferred: "transfer",
 };
 
+// Stock coming in stands out, stock going out is quieter, the rest is plain.
+const TYPE_BADGES: Partial<Record<StockMovementType, "default" | "secondary">> = {
+  received: "default",
+  issued: "secondary",
+};
+
 const TYPE_LABELS: Record<StockMovementType, string> = {
   received: "Received",
   issued: "Issued",
@@ -305,7 +311,7 @@ async function Movements({
                   <TableCell className="whitespace-nowrap">{formatDay(movement.occurredOn)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={movement.type === "received" ? "default" : movement.type === "issued" ? "secondary" : "outline"}>
+                      <Badge variant={TYPE_BADGES[movement.type] ?? "outline"}>
                         {TYPE_LABELS[movement.type]}
                       </Badge>
                       <span className="font-medium">{movement.product.name}</span>
