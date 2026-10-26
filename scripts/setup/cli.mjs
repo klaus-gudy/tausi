@@ -109,13 +109,13 @@ function readFiles(cwd) {
 
 function detectDocker(cwd) {
   if (process.env.SETUP_SKIP_DOCKER) return { compose: false, daemon: false }
-  const ok = (args) => spawnSync("docker", args, { cwd, stdio: "ignore", timeout: 15_000 }).status === 0
+  const ok = (args) => spawnSync("docker", args, { cwd, stdio: "ignore", timeout: 15_000 }).status === 0 // NOSONAR: the developer's own docker, from their PATH
   const compose = ok(["compose", "version"])
   return { compose, daemon: compose && ok(["info"]) }
 }
 
 function volumeExists(name) {
-  return spawnSync("docker", ["volume", "inspect", name], { stdio: "ignore", timeout: 10_000 }).status === 0
+  return spawnSync("docker", ["volume", "inspect", name], { stdio: "ignore", timeout: 10_000 }).status === 0 // NOSONAR: the developer's own docker, from their PATH
 }
 
 /** Docker Compose's default project name: the folder name, normalized. */
@@ -392,7 +392,7 @@ async function run({ args, cwd, files, interactive, p }) {
   log.success(`Environment configuration generated (.env${saved})`)
 
   if (docker.compose) {
-    const check = spawnSync("docker", ["compose", "config", "--quiet"], { cwd, encoding: "utf8", timeout: 30_000 })
+    const check = spawnSync("docker", ["compose", "config", "--quiet"], { cwd, encoding: "utf8", timeout: 30_000 }) // NOSONAR: the developer's own docker, from their PATH
     if (check.status !== 0) {
       undo()
       throw new SetupError(`docker compose config failed, so every file was restored:\n${check.stderr.trim()}`)
@@ -411,7 +411,7 @@ async function run({ args, cwd, files, interactive, p }) {
   if (start) {
     log.line()
     log.line(color.bold("Starting Docker services (Postgres, migrations, app)..."))
-    const up = spawnSync("docker", ["compose", "up", "--build", "-V", "--detach", "--wait", "--wait-timeout", "300"], {
+    const up = spawnSync("docker", ["compose", "up", "--build", "-V", "--detach", "--wait", "--wait-timeout", "300"], { // NOSONAR: the developer's own docker, from their PATH
       cwd,
       stdio: "inherit",
     })
@@ -446,7 +446,7 @@ async function run({ args, cwd, files, interactive, p }) {
 }
 
 function gitIgnores(cwd, file) {
-  const result = spawnSync("git", ["check-ignore", "-q", file], { cwd, stdio: "ignore" })
+  const result = spawnSync("git", ["check-ignore", "-q", file], { cwd, stdio: "ignore" }) // NOSONAR: the developer's own git, from their PATH
   // 0: ignored, 1: not ignored, anything else: not a git repo or no git.
   return result.status !== 1
 }
