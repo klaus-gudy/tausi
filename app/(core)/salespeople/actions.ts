@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { normalizePhone } from "@/lib/dealers";
+import { isEmail } from "@/lib/email";
 import {
   isUniqueViolation,
   isUuid,
@@ -12,8 +13,6 @@ import {
   type ActionResult,
 } from "@/lib/inventory";
 import { getPrisma } from "@/lib/prisma";
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function revalidateSalespeople() {
   revalidatePath("/salespeople");
@@ -38,7 +37,7 @@ export async function saveSalesperson(
   const userId = readText(formData.get("userId"), 100);
   if (!name) return { message: "Enter the salesperson's name." };
   if (typedPhone && !phone) return { message: "Enter a phone number like 0754 123 456, or leave it empty." };
-  if (email && !EMAIL.test(email)) return { message: "Enter a valid email address, or leave it empty." };
+  if (email && !isEmail(email)) return { message: "Enter a valid email address, or leave it empty." };
 
   const prisma = getPrisma();
   const organizationId = member.organization.id;
