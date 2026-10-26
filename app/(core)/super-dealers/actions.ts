@@ -69,7 +69,7 @@ async function readDealer(formData: FormData, organizationId: string) {
 
 function revalidateDealers() {
   revalidatePath("/super-dealers");
-  revalidatePath("/stock");
+  revalidatePath("/movement-history");
   revalidatePath("/deliveries");
 }
 
