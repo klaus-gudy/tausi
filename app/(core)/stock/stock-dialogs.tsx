@@ -136,6 +136,7 @@ export function ProductLines({
     if (unitCost) value += quantity * Number(unitCost);
     else if (quantity) uncosted += 1;
   }
+  const uncostedLines = uncosted === 1 ? "1 line has" : `${uncosted} lines have`;
 
   return (
     <FieldSet>
@@ -220,9 +221,7 @@ export function ProductLines({
         <FieldDescription className="tabular-nums">
           {formatCount(units)} {units === 1 ? "unit" : "units"}
           {value ? ` worth ${formatCount(value)}` : ""}
-          {value && uncosted
-            ? ` (${uncosted} ${uncosted === 1 ? "line has" : "lines have"} no unit cost)`
-            : ""}
+          {value && uncosted ? ` (${uncostedLines} no unit cost)` : ""}
         </FieldDescription>
       ) : null}
     </FieldSet>
@@ -447,7 +446,8 @@ function IssueForm({
         {inStock.length ? (
           // Lines picked from one warehouse don't carry over to another.
           <ProductLines key={warehouseId} products={inStock} withCost={false} showOnHand />
-        ) : warehouse ? (
+        ) : null}
+        {!inStock.length && warehouse ? (
           <FieldDescription>Nothing is in stock in {warehouse.name}. Receive stock first.</FieldDescription>
         ) : null}
         <Field>
