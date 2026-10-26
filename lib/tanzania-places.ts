@@ -1,7 +1,7 @@
 // Tanzania's 8 sales zones, 31 regions (26 mainland, 5 Zanzibar) and their
 // 150 districts as of the 2022 census, in list order: what a new
 // organization's places can start from. Region and district keys are slugs
-// of their names; see placeKey in lib/places.ts.
+// of their names; see placeKey in lib/place-key.ts.
 export const TANZANIA_PLACES: {
   key: string
   name: string
