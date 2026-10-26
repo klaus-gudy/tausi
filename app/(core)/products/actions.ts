@@ -60,7 +60,8 @@ export async function saveProduct(
   }
 
   revalidatePath("/products");
-  revalidatePath("/stock");
+  revalidatePath("/stock-on-hand");
+  revalidatePath("/movement-history");
   return { success: true, message: id ? `${name} saved.` : `${name} added.` };
 }
 
@@ -76,6 +77,7 @@ export async function setProductArchived(id: string, archived: boolean): Promise
   if (!count) return { message: "That product no longer exists." };
 
   revalidatePath("/products");
-  revalidatePath("/stock");
+  revalidatePath("/stock-on-hand");
+  revalidatePath("/movement-history");
   return { success: true, message: archived ? "Product archived." : "Product restored." };
 }
