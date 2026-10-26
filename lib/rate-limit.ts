@@ -37,5 +37,6 @@ export async function rateLimit(key: string, limit: number, windowSeconds: numbe
 /** "Too many attempts. Try again in 12 minutes." */
 export function tooManyAttempts(retryAfterSeconds: number) {
   const minutes = Math.ceil(retryAfterSeconds / 60)
-  return `Too many attempts. Try again in ${minutes === 1 ? "a minute" : `${minutes} minutes`}.`
+  const wait = minutes === 1 ? "a minute" : `${minutes} minutes`
+  return `Too many attempts. Try again in ${wait}.`
 }
