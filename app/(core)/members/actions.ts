@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { normalizePhone } from "@/lib/dealers";
+import { isEmail } from "@/lib/email";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { assignableRoles, readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -11,7 +12,6 @@ import { createToken } from "@/lib/tokens";
 // Every action re-reads the session and membership: the page only hides
 // controls, it doesn't authorize anything.
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const INVITATION_DAYS = 7;
 const MAX_NAME = 100;
 
@@ -89,7 +89,7 @@ export async function inviteMember(
   if (!member) return notAllowed;
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  if (!EMAIL.test(email)) return { message: "Enter a valid email address." };
+  if (!isEmail(email)) return { message: "Enter a valid email address." };
   const contact = readContact(formData);
   if (contact.error !== null) return { message: contact.error };
 
