@@ -1,18 +1,285 @@
 import type { Metadata } from "next";
-import { Boxes } from "lucide-react";
+import { connection } from "next/server";
+import { Suspense } from "react";
+import { Package, UserCheck } from "lucide-react";
 
-import { ComingSoon } from "@/components/coming-soon";
+import { NoAccessState } from "@/components/no-access-state";
+import { UrlTabs } from "@/components/url-tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TabsContent } from "@/components/ui/tabs";
+import { heldStock } from "@/lib/deliveries";
+import { formatCount } from "@/lib/format";
+import { stockByWarehouse, stockInTransit } from "@/lib/inventory";
+import { readActiveMember } from "@/lib/membership";
+import { getPrisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Stock on hand",
 };
 
-export default function StockOnHandPage() {
+type Product = { id: string; name: string; code: string; size: string | null };
+type Warehouse = { id: string; name: string; inactive: boolean };
+
+export default function StockOnHandPage({ searchParams }: PageProps<"/stock-on-hand">) {
   return (
-    <ComingSoon
-      title="Stock on hand"
-      description="How much of each product is in each warehouse and with each salesperson."
-      icon={Boxes}
-    />
+    <>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Stock on hand</h1>
+        <p className="text-sm text-muted-foreground">
+          How much of each product is in each warehouse and with each salesperson.
+        </p>
+      </div>
+      <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+        <StockOnHand searchParams={searchParams} />
+      </Suspense>
+    </>
+  );
+}
+
+async function StockOnHand({ searchParams }: Pick<PageProps<"/stock-on-hand">, "searchParams">) {
+  await connection();
+  const member = await readActiveMember();
+  if (!member) return <NoAccessState reason="no-organization" />;
+  if (!member.permissions.has("products.read")) return <NoAccessState reason="no-permission" />;
+
+  const canSeeSalespeople = member.permissions.has("salespeople.read");
+  const tab = canSeeSalespeople && (await searchParams).tab === "salespeople" ? "salespeople" : "products";
+  const organizationId = member.organization.id;
+
+  const prisma = getPrisma();
+  const [allProducts, allWarehouses, salespeople, inWarehouses, inTransit, held] = await Promise.all([
+    prisma.product.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, code: true, size: true, archivedAt: true },
+    }),
+    prisma.warehouse.findMany({
+      where: { organizationId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { id: true, name: true, deactivatedAt: true },
+    }),
+    canSeeSalespeople
+      ? prisma.salesperson.findMany({
+          where: { organizationId },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : [],
+    stockByWarehouse(organizationId),
+    stockInTransit(organizationId),
+    heldStock(organizationId),
+  ]);
+
+  // What all salespeople hold together, per product.
+  const withSalespeople = new Map<string, number>();
+  for (const products of held.values()) {
+    for (const [productId, units] of products) {
+      withSalespeople.set(productId, (withSalespeople.get(productId) ?? 0) + units);
+    }
+  }
+  const inWarehouse = (warehouseId: string, productId: string) => inWarehouses[warehouseId]?.[productId] ?? 0;
+  // Inactive warehouses and archived products only show while they still hold stock.
+  const warehouses: Warehouse[] = allWarehouses
+    .filter(
+      (warehouse) =>
+        !warehouse.deactivatedAt || Object.values(inWarehouses[warehouse.id] ?? {}).some(Boolean)
+    )
+    .map((warehouse) => ({ id: warehouse.id, name: warehouse.name, inactive: !!warehouse.deactivatedAt }));
+  const rows = allProducts
+    .map((product) => {
+      const warehouseUnits = warehouses.map((warehouse) => inWarehouse(warehouse.id, product.id));
+      const transit = inTransit.get(product.id) ?? 0;
+      const field = withSalespeople.get(product.id) ?? 0;
+      const total = warehouseUnits.reduce((sum, units) => sum + units, 0) + transit + field;
+      return { product, warehouseUnits, transit, field, total };
+    })
+    .filter((row) => !row.product.archivedAt || row.total);
+
+  const holders = salespeople
+    .map((salesperson) => ({
+      ...salesperson,
+      products: allProducts
+        .map((product) => ({ product, units: held.get(salesperson.id)?.get(product.id) ?? 0 }))
+        .filter((line) => line.units),
+    }))
+    .filter((holder) => holder.products.length);
+
+  const tabs = [{ value: "products", label: "By product" }];
+  if (canSeeSalespeople) tabs.push({ value: "salespeople", label: "By salesperson" });
+
+  return (
+    <UrlTabs defaultValue={tab} tabs={tabs}>
+      <TabsContent value={tab}>
+        {tab === "products" ? (
+          <ByProduct rows={rows} warehouses={warehouses} />
+        ) : (
+          <BySalesperson holders={holders} />
+        )}
+      </TabsContent>
+    </UrlTabs>
+  );
+}
+
+function ByProduct({
+  rows,
+  warehouses,
+}: {
+  rows: { product: Product; warehouseUnits: number[]; transit: number; field: number; total: number }[];
+  warehouses: Warehouse[];
+}) {
+  if (!rows.length) {
+    return (
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Package />
+          </EmptyMedia>
+          <EmptyTitle>No products yet</EmptyTitle>
+          <EmptyDescription>
+            Add products under Products first, then receive stock under Goods received.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  const sum = (pick: (row: (typeof rows)[number]) => number) =>
+    rows.reduce((total, row) => total + pick(row), 0);
+
+  return (
+    <Card>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Product</TableHead>
+              {warehouses.map((warehouse) => (
+                <TableHead key={warehouse.id} className="hidden text-right md:table-cell">
+                  {warehouse.name}
+                  {warehouse.inactive ? " (inactive)" : ""}
+                </TableHead>
+              ))}
+              <TableHead className="hidden text-right lg:table-cell">In transit</TableHead>
+              <TableHead className="hidden text-right lg:table-cell">With salespeople</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map(({ product, warehouseUnits, transit, field, total }) => (
+              <TableRow key={product.id}>
+                <TableCell>
+                  <div className="font-medium">{product.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {product.code}
+                    {product.size ? ` · ${product.size}` : ""}
+                  </div>
+                </TableCell>
+                {warehouseUnits.map((units, index) => (
+                  <UnitsCell key={warehouses[index].id} units={units} className="hidden md:table-cell" />
+                ))}
+                <UnitsCell units={transit} className="hidden lg:table-cell" />
+                <UnitsCell units={field} className="hidden lg:table-cell" />
+                <TableCell className="text-right font-medium tabular-nums">{formatCount(total)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell className="font-medium">All products</TableCell>
+              {warehouses.map((warehouse, index) => (
+                <UnitsCell
+                  key={warehouse.id}
+                  units={sum((row) => row.warehouseUnits[index])}
+                  className="hidden md:table-cell"
+                />
+              ))}
+              <UnitsCell units={sum((row) => row.transit)} className="hidden lg:table-cell" />
+              <UnitsCell units={sum((row) => row.field)} className="hidden lg:table-cell" />
+              <TableCell className="text-right font-medium tabular-nums">
+                {formatCount(sum((row) => row.total))}
+              </TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** A right-aligned count; nothing held reads as a quiet dash. */
+function UnitsCell({ units, className }: { units: number; className?: string }) {
+  return (
+    <TableCell className={`text-right tabular-nums ${units ? "" : "text-muted-foreground"} ${className ?? ""}`}>
+      {units ? formatCount(units) : "—"}
+    </TableCell>
+  );
+}
+
+function BySalesperson({
+  holders,
+}: {
+  holders: { id: string; name: string; products: { product: Product; units: number }[] }[];
+}) {
+  if (!holders.length) {
+    return (
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <UserCheck />
+          </EmptyMedia>
+          <EmptyTitle>No salesperson holds stock</EmptyTitle>
+          <EmptyDescription>
+            Stock shows here once a salesperson acknowledges a transfer, until they supply it to dealers.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Salesperson</TableHead>
+              <TableHead>Product</TableHead>
+              <TableHead className="text-right">Units</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {holders.flatMap((holder) =>
+              holder.products.map(({ product, units }, index) => (
+                <TableRow key={`${holder.id}-${product.id}`}>
+                  <TableCell className="font-medium">{index === 0 ? holder.name : null}</TableCell>
+                  <TableCell>
+                    {product.name}
+                    {product.size ? <span className="text-muted-foreground"> · {product.size}</span> : null}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCount(units)}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
