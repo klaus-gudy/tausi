@@ -106,6 +106,8 @@ function ProductForm({
     initialState
   );
 
+  const submitLabel = product ? "Save changes" : "Add product";
+
   return (
     <form onSubmit={onSubmit}>
       <DialogHeader>
@@ -170,7 +172,7 @@ function ProductForm({
       </FieldGroup>
       <DialogFooter>
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : product ? "Save changes" : "Add product"}
+          {pending ? "Saving…" : submitLabel}
         </Button>
       </DialogFooter>
     </form>
