@@ -130,8 +130,8 @@ export async function onboardSuperDealer(
   if (typeof data === "string") return { message: data };
 
   // Both coordinates or neither; the phone fills them in.
-  const latitude = Number(formData.get("latitude") || NaN);
-  const longitude = Number(formData.get("longitude") || NaN);
+  const latitude = Number(formData.get("latitude") || Number.NaN);
+  const longitude = Number(formData.get("longitude") || Number.NaN);
   const located =
     Number.isFinite(latitude) && Number.isFinite(longitude) &&
     Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
