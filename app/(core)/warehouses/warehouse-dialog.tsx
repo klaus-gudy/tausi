@@ -145,6 +145,8 @@ function WarehouseForm({
   const keeperName =
     keeper === SAVED ? savedName : (keepers.find((k) => k.id === keeper)?.name ?? "");
 
+  const submitLabel = warehouse ? "Save changes" : "Add warehouse";
+
   return (
     <form onSubmit={onSubmit}>
       <DialogHeader>
@@ -244,7 +246,7 @@ function WarehouseForm({
       </FieldGroup>
       <DialogFooter>
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : warehouse ? "Save changes" : "Add warehouse"}
+          {pending ? "Saving…" : submitLabel}
         </Button>
       </DialogFooter>
     </form>
