@@ -435,26 +435,40 @@ function StatTile({
         <CardTitle className="text-2xl font-semibold">{value}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-1 text-sm">
-        {delta !== undefined && delta !== null ? (
-          <div
-            className={`flex items-center gap-1 ${delta > 0 ? "text-emerald-700 dark:text-emerald-400" : delta < 0 ? "text-destructive" : "text-muted-foreground"}`}
-          >
-            {delta > 0 ? <ArrowUpRight className="size-4" /> : delta < 0 ? <ArrowDownRight className="size-4" /> : <Minus className="size-4" />}
-            <span>
-              {delta > 0 ? "+" : ""}
-              {delta}% vs the {WINDOW_DAYS} days before
-            </span>
-          </div>
-        ) : null}
+        {delta !== undefined && delta !== null ? <Trend delta={delta} /> : null}
         {detail ? <div className="text-muted-foreground">{detail}</div> : null}
       </CardContent>
     </Card>
   );
 }
 
+const TRENDS = {
+  up: { className: "text-emerald-700 dark:text-emerald-400", Icon: ArrowUpRight },
+  down: { className: "text-destructive", Icon: ArrowDownRight },
+  flat: { className: "text-muted-foreground", Icon: Minus },
+};
+
+/** "+12% vs the 30 days before", with an arrow and colour for the direction. */
+function Trend({ delta }: { delta: number }) {
+  let trend = TRENDS.flat;
+  if (delta > 0) trend = TRENDS.up;
+  else if (delta < 0) trend = TRENDS.down;
+  return (
+    <div className={`flex items-center gap-1 ${trend.className}`}>
+      <trend.Icon className="size-4" />
+      <span>
+        {delta > 0 ? "+" : ""}
+        {delta}% vs the {WINDOW_DAYS} days before
+      </span>
+    </div>
+  );
+}
+
 /** Days of stock left, flagged with an icon and words as well as colour. */
 function DaysLeft({ days }: { days: number }) {
-  const shown = days < 1 ? "Under a day" : `${Math.floor(days)} ${Math.floor(days) === 1 ? "day" : "days"}`;
+  const whole = Math.floor(days);
+  const unit = whole === 1 ? "day" : "days";
+  const shown = days < 1 ? "Under a day" : `${whole} ${unit}`;
   if (days < URGENT_DAYS) {
     return (
       <span className="inline-flex items-center gap-1 text-destructive">
