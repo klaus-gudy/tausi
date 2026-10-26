@@ -31,6 +31,7 @@ function revalidateDeliveries() {
   revalidatePath("/deliveries");
   revalidatePath("/transfers");
   revalidatePath("/salespeople");
+  revalidatePath("/stock-on-hand");
   revalidatePath("/super-dealers");
 }
 
