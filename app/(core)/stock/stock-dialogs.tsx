@@ -2,10 +2,10 @@
 
 import { useRef, useState } from "react";
 import { format } from "date-fns";
-import { ClipboardCheck, PackageMinus, PackagePlus, Plus, Trash2 } from "lucide-react";
+import { ClipboardCheck, PackagePlus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { adjustStock, issueStock, receiveStock } from "./actions";
+import { adjustStock, receiveStock } from "./actions";
 import { DatePicker } from "@/components/date-picker";
 import { MoneyInput } from "@/components/money-input";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,6 @@ export type StockProduct = {
 export type StockWarehouse = { id: string; name: string };
 /** Stock on hand per warehouse id, then per product id; missing entries are 0. */
 export type StockLevels = Record<string, Record<string, number>>;
-export type StockDealer = { id: string; name: string; region: string | null };
 
 type Action = (previous: ActionResult, formData: FormData) => Promise<ActionResult>;
 
@@ -104,7 +103,7 @@ export function useDialogAction(action: Action, onDone: () => void) {
   }, initialState);
 }
 
-/** Product rows for a receive, issue or transfer form; submits parallel productId/quantity fields. */
+/** Product rows for a receive, transfer or delivery form; submits parallel productId/quantity fields. */
 export function ProductLines({
   products,
   withCost,
@@ -341,124 +340,6 @@ function ReceiveForm({
       <DialogFooter>
         <Button type="submit" disabled={pending || !warehouseId}>
           {pending ? "Recording…" : "Record receipt"}
-        </Button>
-      </DialogFooter>
-    </form>
-  );
-}
-
-export function IssueStockDialog({
-  products,
-  dealers,
-  warehouses,
-  stock,
-}: {
-  products: StockProduct[];
-  dealers: StockDealer[];
-  warehouses: StockWarehouse[];
-  stock: StockLevels;
-}) {
-  return (
-    <FormDialog
-      label="Issue to dealer"
-      variant="outline"
-      icon={<PackageMinus data-icon="inline-start" />}
-    >
-      {(close) => (
-        <IssueForm
-          products={products}
-          dealers={dealers}
-          warehouses={warehouses}
-          stock={stock}
-          onDone={close}
-        />
-      )}
-    </FormDialog>
-  );
-}
-
-function IssueForm({
-  products,
-  dealers,
-  warehouses,
-  stock,
-  onDone,
-}: {
-  products: StockProduct[];
-  dealers: StockDealer[];
-  warehouses: StockWarehouse[];
-  stock: StockLevels;
-  onDone: () => void;
-}) {
-  const [state, onSubmit, pending] = useDialogAction(issueStock, onDone);
-  // Start from the first warehouse that has anything to issue.
-  const [warehouseId, setWarehouseId] = useState(
-    () => (warehouses.find((warehouse) => unitsIn(stock, warehouse.id) > 0) ?? warehouses[0])?.id ?? ""
-  );
-  const warehouse = warehouses.find((other) => other.id === warehouseId);
-  const day = today();
-  const inStock = productsIn(products, stock, warehouseId).filter((product) => product.onHand > 0);
-
-  return (
-    <form onSubmit={onSubmit}>
-      <DialogHeader>
-        <DialogTitle>Issue stock to a super dealer</DialogTitle>
-        <DialogDescription>Record stock leaving the store. It comes off stock on hand.</DialogDescription>
-      </DialogHeader>
-      <FieldGroup className="py-4">
-        <WarehouseField
-          id="issue-warehouse"
-          warehouses={warehouses}
-          value={warehouseId}
-          onChange={setWarehouseId}
-          stock={stock}
-        />
-        <div className="grid gap-5 sm:grid-cols-3">
-          <Field>
-            <FieldLabel htmlFor="issue-dealer">Super dealer</FieldLabel>
-            <NativeSelect
-              id="issue-dealer"
-              name="superDealerId"
-              defaultValue=""
-              className="w-full"
-              required
-            >
-              <NativeSelectOption value="" disabled>
-                Pick a dealer
-              </NativeSelectOption>
-              {dealers.map((dealer) => (
-                <NativeSelectOption key={dealer.id} value={dealer.id}>
-                  {dealer.name}
-                  {dealer.region ? ` · ${dealer.region}` : ""}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="issue-reference">Dispatch number</FieldLabel>
-            <Input id="issue-reference" name="reference" autoComplete="off" maxLength={100} />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="issue-day">Issued on</FieldLabel>
-            <DatePicker id="issue-day" name="occurredOn" defaultValue={day} maxDate={day} />
-          </Field>
-        </div>
-        {inStock.length ? (
-          // Lines picked from one warehouse don't carry over to another.
-          <ProductLines key={warehouseId} products={inStock} withCost={false} showOnHand />
-        ) : null}
-        {!inStock.length && warehouse ? (
-          <FieldDescription>Nothing is in stock in {warehouse.name}. Receive stock first.</FieldDescription>
-        ) : null}
-        <Field>
-          <FieldLabel htmlFor="issue-note">Note</FieldLabel>
-          <Textarea id="issue-note" name="note" maxLength={1000} rows={2} />
-        </Field>
-        {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
-      </FieldGroup>
-      <DialogFooter>
-        <Button type="submit" disabled={pending || !inStock.length}>
-          {pending ? "Recording…" : "Record issue"}
         </Button>
       </DialogFooter>
     </form>
