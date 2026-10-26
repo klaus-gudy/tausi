@@ -112,6 +112,8 @@ function DealerForm({
     initialState
   );
 
+  const submitLabel = dealer ? "Save changes" : "Add dealer";
+
   return (
     <form onSubmit={onSubmit}>
       <DialogHeader>
@@ -232,7 +234,7 @@ function DealerForm({
       </FieldGroup>
       <DialogFooter>
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : dealer ? "Save changes" : "Add dealer"}
+          {pending ? "Saving…" : submitLabel}
         </Button>
       </DialogFooter>
     </form>
