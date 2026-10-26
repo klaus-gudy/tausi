@@ -132,6 +132,8 @@ function SalespersonForm({
     initialState
   );
 
+  const submitLabel = salesperson ? "Save changes" : "Add salesperson";
+
   return (
     <form onSubmit={onSubmit}>
       <DialogHeader>
@@ -228,7 +230,7 @@ function SalespersonForm({
       </FieldGroup>
       <DialogFooter>
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : salesperson ? "Save changes" : "Add salesperson"}
+          {pending ? "Saving…" : submitLabel}
         </Button>
       </DialogFooter>
     </form>
