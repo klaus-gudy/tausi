@@ -55,17 +55,16 @@ export function LoadMore({
       ref={end}
       className="flex flex-col items-center gap-2 py-2 text-sm text-muted-foreground"
     >
-      {more ? (
-        pending ? (
-          <p className="flex items-center gap-2" role="status">
-            <Spinner />
-            Loading more…
-          </p>
-        ) : (
-          <Button variant="outline" size="sm" onClick={loadMore}>
-            Load more
-          </Button>
-        )
+      {more && pending ? (
+        <p className="flex items-center gap-2" role="status">
+          <Spinner />
+          Loading more…
+        </p>
+      ) : null}
+      {more && !pending ? (
+        <Button variant="outline" size="sm" onClick={loadMore}>
+          Load more
+        </Button>
       ) : null}
       <p>
         {visible === total
