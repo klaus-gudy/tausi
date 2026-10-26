@@ -1,15 +1,8 @@
 import type { PlaceZone } from "@/lib/dealers"
 import type { Prisma } from "@/lib/generated/prisma/client"
+import { placeKey } from "@/lib/place-key"
 import { getPrisma } from "@/lib/prisma"
 import { TANZANIA_PLACES } from "@/lib/tanzania-places"
-
-/** "Dar es Salaam" -> "dar-es-salaam", "Nyang'hwale" -> "nyang-hwale". */
-export function placeKey(name: string) {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-}
 
 /**
  * Gives a new organization Tanzania's zones, regions and districts, so its
