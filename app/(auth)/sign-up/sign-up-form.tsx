@@ -161,6 +161,33 @@ function OrganizationStep({
 
 const initialSignUp: SignUpState = { message: "" };
 
+/** Whose organization the new account owns or joins. */
+function AccountIntro({
+  organization,
+  invitation,
+}: {
+  organization: string | null;
+  invitation: Invitation | null;
+}) {
+  if (organization) {
+    return (
+      <>
+        You&apos;ll own{" "}
+        <span className="font-medium text-foreground">{organization}</span>.
+      </>
+    );
+  }
+  if (invitation) {
+    return (
+      <>
+        You&apos;ll join as{" "}
+        <span className="font-medium text-foreground">{invitation.roleName}</span>.
+      </>
+    );
+  }
+  return "Enter your details to accept the invitation.";
+}
+
 function AccountStep({
   organization,
   withPlaces,
@@ -182,6 +209,7 @@ function AccountStep({
     },
     initialSignUp
   );
+  const submitLabel = invitation ? "Accept invitation" : "Create account";
 
   return (
     <Card>
@@ -191,19 +219,7 @@ function AccountStep({
           {invitation ? `Join ${invitation.organizationName}` : "Create your account"}
         </CardTitle>
         <CardDescription>
-          {organization ? (
-            <>
-              You&apos;ll own{" "}
-              <span className="font-medium text-foreground">{organization}</span>.
-            </>
-          ) : invitation ? (
-            <>
-              You&apos;ll join as{" "}
-              <span className="font-medium text-foreground">{invitation.roleName}</span>.
-            </>
-          ) : (
-            "Enter your details to accept the invitation."
-          )}
+          <AccountIntro organization={organization} invitation={invitation} />
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -261,11 +277,7 @@ function AccountStep({
             ) : null}
             <Field>
               <Button type="submit" disabled={pending}>
-                {pending
-                  ? "Creating account…"
-                  : invitation
-                    ? "Accept invitation"
-                    : "Create account"}
+                {pending ? "Creating account…" : submitLabel}
               </Button>
               {organization ? (
                 <Button type="button" variant="ghost" onClick={() => onBack()}>
