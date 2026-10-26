@@ -388,7 +388,8 @@ async function run({ args, cwd, files, interactive, p }) {
     fs.chmodSync(path.join(cwd, backup), 0o600)
   }
   const undo = writeAll(cwd, changes)
-  log.success(`Environment configuration generated (.env${backup ? `, previous one saved as ${backup}` : ""})`)
+  const saved = backup ? `, previous one saved as ${backup}` : ""
+  log.success(`Environment configuration generated (.env${saved})`)
 
   if (docker.compose) {
     const check = spawnSync("docker", ["compose", "config", "--quiet"], { cwd, encoding: "utf8", timeout: 30_000 })
@@ -435,7 +436,10 @@ async function run({ args, cwd, files, interactive, p }) {
         `Check that migrations are applied: ${color.cyan("npm run db:status")}`,
         `Open ${url} and sign up; the first account owns the first organization.`,
       ]
-  if (!reconfiguring) steps.push(`Commit the renamed project files: ${color.cyan(`git add -A && git commit -m "chore: initialize ${projectName}"`)}`)
+  if (!reconfiguring) {
+    const commit = `git add -A && git commit -m "chore: initialize ${projectName}"`
+    steps.push(`Commit the renamed project files: ${color.cyan(commit)}`)
+  }
   steps.forEach((step, i) => log.line(`  ${i + 1}. ${step}`))
   log.line(color.dim(`  Prisma Studio: docker compose up studio, then http://localhost:${studioPort}`))
   return started || !start ? 0 : 1
@@ -449,12 +453,13 @@ function gitIgnores(cwd, file) {
 
 function printEnvDiff(before, after) {
   const secret = (key) => /PASSWORD|DATABASE_URL/.test(key)
+  const was = (key) => before[key] || color.dim(key in before ? "(empty)" : "(unset)")
   const lines = Object.keys(after)
     .filter((key) => before[key] !== after[key])
     .map((key) =>
       secret(key)
         ? `  ${key}: ${color.dim("(changed, not shown)")}`
-        : `  ${key}: ${before[key] || color.dim(key in before ? "(empty)" : "(unset)")} → ${after[key] || color.dim("(empty)")}`
+        : `  ${key}: ${was(key)} → ${after[key] || color.dim("(empty)")}`
     )
   if (lines.length) {
     log.line(color.bold("Changes to .env:"))
