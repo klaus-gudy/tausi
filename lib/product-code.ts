@@ -11,9 +11,9 @@ export function productCode(name: string, size?: string | null) {
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/^-|-$/g, "")
     .slice(0, MAX_LENGTH)
-    .replace(/-+$/, "")
+    .replace(/-$/, "")
 }
 
 /** `code`, or `code-2`, `code-3`… whichever `taken` (upper-cased codes) doesn't hold. */
@@ -21,7 +21,7 @@ export function uniqueProductCode(code: string, taken: Set<string>) {
   if (!taken.has(code)) return code
   for (let n = 2; ; n++) {
     const suffix = `-${n}`
-    const candidate = `${code.slice(0, MAX_LENGTH - suffix.length).replace(/-+$/, "")}${suffix}`
+    const candidate = `${code.slice(0, MAX_LENGTH - suffix.length).replace(/-$/, "")}${suffix}`
     if (!taken.has(candidate)) return candidate
   }
 }
