@@ -147,7 +147,7 @@ async function Products({ searchParams }: Pick<PageProps<"/products">, "searchPa
               </EmptyTitle>
               <EmptyDescription>
                 {tab === "archived"
-                  ? "Archived products keep their stock history but can't be received or issued."
+                  ? "Archived products keep their stock history but can't be received or sent out."
                   : "Add the products you stock, then record stock as it arrives."}
               </EmptyDescription>
             </EmptyHeader>
