@@ -21,14 +21,14 @@ export function slugify(value) {
   return String(value)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/^-|-$/g, "")
     .slice(0, 50)
-    .replace(/-+$/, "")
+    .replace(/-$/, "")
 }
 
 /** "inventory-app" -> "inventory_app", safe as a Postgres identifier. */
 export function toIdentifier(value) {
-  let id = String(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+  let id = String(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
   if (!/^[a-z_]/.test(id)) id = `app_${id}`
   return id.slice(0, 63)
 }
@@ -165,7 +165,7 @@ export function databaseUrl({ user, password, host, port, name, schema }) {
 // anything beyond plain characters wrapped in single quotes, which all three
 // take literally (no $ interpolation, no # comments).
 
-const KEY_LINE = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/
+const KEY_LINE = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=(.*)$/
 
 export function formatEnvValue(value) {
   const text = String(value)
@@ -185,7 +185,8 @@ function parseEnvValue(raw) {
     }
   }
   // Unquoted: an inline comment starts at " #".
-  return value.replace(/\s+#.*$/, "")
+  const comment = value.search(/\s#/)
+  return comment < 0 ? value : value.slice(0, comment).trimEnd()
 }
 
 /** Parses .env text into an ordered { key: value } object. */
