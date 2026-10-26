@@ -11,6 +11,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"scripts/**/*.test.mjs\"",
+    "test:coverage": "mkdir -p coverage && node --test --experimental-test-coverage --test-coverage-exclude=\"**/*.test.mjs\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info \"scripts/**/*.test.mjs\"",
     "db:generate": "docker compose exec web npx prisma generate",
     "db:migrate": "docker compose exec web sh -c \"npx prisma migrate dev && npx prisma generate\"",
     "db:studio": "docker compose up studio",
