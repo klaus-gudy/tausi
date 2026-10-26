@@ -20,7 +20,10 @@ export function formatDay(value: Date) {
 
 /** "+12" or "−3", with thousands separators. */
 export function formatSigned(value: number) {
-  return `${value > 0 ? "+" : value < 0 ? "−" : ""}${count.format(Math.abs(value))}`
+  let sign = ""
+  if (value > 0) sign = "+"
+  else if (value < 0) sign = "−"
+  return `${sign}${count.format(Math.abs(value))}`
 }
 
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 })
