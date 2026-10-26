@@ -26,7 +26,8 @@ import { getPrisma } from "@/lib/prisma";
 // Each form picks the warehouse the stock is received into or counted in.
 
 function revalidateInventory() {
-  revalidatePath("/stock");
+  revalidatePath("/stock-on-hand");
+  revalidatePath("/movement-history");
   revalidatePath("/goods-received", "layout");
   revalidatePath("/products");
   revalidatePath("/super-dealers");
