@@ -63,7 +63,6 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     permissions: [
       { key: "stock.read", label: "View stock movements" },
       { key: "stock.receive", label: "Record stock received from suppliers" },
-      { key: "stock.issue", label: "Record stock issued to super dealers" },
       { key: "stock.transfer", label: "Send stock to salespeople and update it until it arrives" },
       { key: "stock.adjust", label: "Correct stock after a count and reverse movements" },
     ],
