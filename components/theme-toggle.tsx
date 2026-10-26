@@ -40,6 +40,9 @@ export function ThemeToggle() {
       flushSync(() => setTheme(next))
     })
 
+    // `ready` rejects when the browser skips the transition (a hidden tab, a
+    // second toggle mid-way); the theme has still changed, so there's nothing
+    // to reveal.
     transition.ready.then(() => {
       document.documentElement.animate(
         {
@@ -54,7 +57,7 @@ export function ThemeToggle() {
           pseudoElement: "::view-transition-new(root)",
         }
       )
-    })
+    }, () => {})
   }
 
   return (
