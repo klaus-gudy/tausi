@@ -28,7 +28,8 @@ import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
 function revalidateTransfers() {
   revalidatePath("/transfers");
   revalidatePath("/salespeople");
-  revalidatePath("/stock");
+  revalidatePath("/stock-on-hand");
+  revalidatePath("/movement-history");
   revalidatePath("/products");
 }
 
