@@ -6,7 +6,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import { isUniqueViolation, isUuid, memberWith, notAllowed, readText, type ActionResult } from "@/lib/inventory";
 import { SYSTEM_ROLES } from "@/lib/membership";
 import { withReadKeys } from "@/lib/permissions";
-import { placeKey } from "@/lib/places";
+import { placeKey } from "@/lib/place-key";
 import { getPrisma } from "@/lib/prisma";
 
 // Only the organization's own roles are edited here. Owner, the one system
