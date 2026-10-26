@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { isEmail } from "@/lib/email";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { claimInvitation, findOpenInvitation, invitationToken } from "@/lib/invitations";
 import {
@@ -16,7 +17,6 @@ import { getPrisma } from "@/lib/prisma";
 import { createSession, deleteSession } from "@/lib/session";
 import { setFlash } from "@/lib/set-flash";
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 const MAX_PASSWORD = 256;
 
@@ -128,7 +128,7 @@ export async function signUp(
     return { message: "Enter your organization's name.", organizationTaken: true };
   }
   if (!name) return error("Enter your name.");
-  if (!EMAIL.test(email)) return error("Enter a valid email address.");
+  if (!isEmail(email)) return error("Enter a valid email address.");
   if (password.length < MIN_PASSWORD || password.length > MAX_PASSWORD) {
     return error(`Use a password of at least ${MIN_PASSWORD} characters.`);
   }
