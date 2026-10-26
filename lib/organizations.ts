@@ -51,7 +51,6 @@ const STARTER_ROLES = [
       "salespeople.read",
       "stock.read",
       "stock.receive",
-      "stock.issue",
       "stock.transfer",
       "stock.adjust",
     ],
