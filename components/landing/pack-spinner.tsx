@@ -11,11 +11,21 @@ const DEGREES_PER_SECOND = 26
 // of the width, about what a pack of nine holds.
 const HEIGHT = 800 / 1120
 const DEPTH = 0.3
+const START_ANGLE = -30
+
+// The face most in view at each quarter turn, for screen readers.
+const FACES = ["Front", "Side", "Back", "Side"]
+
+/** The turn as a slider value: whole degrees 0–359 and the face in view. */
+function turnOf(angle: number) {
+  const degrees = Math.round(((angle % 360) + 360) % 360) % 360
+  return { degrees, face: FACES[Math.round(degrees / 90) % 4] }
+}
 
 export function PackSpinner() {
   const packRef = useRef<HTMLDivElement>(null)
   const shadowRef = useRef<HTMLDivElement>(null)
-  const angle = useRef(-30)
+  const angle = useRef(START_ANGLE)
   const drag = useRef<{ x: number; velocity: number } | null>(null)
   const nudge = useRef(0)
 
@@ -69,23 +79,37 @@ export function PackSpinner() {
     angle.current += dx * 0.5
   }
 
-  function onPointerUp() {
-    if (drag.current) nudge.current = drag.current.velocity
-    drag.current = null
+  // Only after a turn by hand: updating it every frame of the steady spin
+  // would keep a screen reader talking.
+  function announce(node: HTMLElement) {
+    const { degrees, face } = turnOf(angle.current)
+    node.setAttribute("aria-valuenow", String(degrees))
+    node.setAttribute("aria-valuetext", face)
   }
 
-  function onKeyDown(event: React.KeyboardEvent) {
+  function onPointerUp(event: React.PointerEvent<HTMLElement>) {
+    if (drag.current) nudge.current = drag.current.velocity
+    drag.current = null
+    announce(event.currentTarget)
+  }
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (event.key === "ArrowLeft") angle.current -= 20
     else if (event.key === "ArrowRight") angle.current += 20
     else return
     event.preventDefault()
+    announce(event.currentTarget)
   }
 
   return (
     <div className="flex flex-col items-center select-none [--w:clamp(220px,62vw,400px)] md:[--w:clamp(260px,34vw,420px)]">
       <div
-        role="img"
+        role="slider"
         aria-label="The Tausi Premium pack, 9 pads of 340 mm, turning to show its front, sides and back. Drag or use the arrow keys to turn it."
+        aria-valuemin={0}
+        aria-valuemax={359}
+        aria-valuenow={turnOf(START_ANGLE).degrees}
+        aria-valuetext={turnOf(START_ANGLE).face}
         tabIndex={0}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
