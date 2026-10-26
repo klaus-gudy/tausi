@@ -62,7 +62,8 @@ export async function createRole(_previous: SaveRoleResult, formData: FormData):
   const taken = new Set([...SYSTEM_ROLES, ...roles.map((role) => role.key)]);
   const base = placeKey(name) || "role";
   let key = base;
-  for (let n = 2; taken.has(key); n++) key = `${base}-${n}`;
+  let n = 1;
+  while (taken.has(key)) key = `${base}-${++n}`;
 
   let id: string;
   try {
