@@ -35,6 +35,7 @@ import { deliveryNumber, heldStock, readOwnSalesperson } from "@/lib/deliveries"
 import { formatCount, formatDate, formatDay, formatTime } from "@/lib/format";
 import { currentPage } from "@/lib/list-size";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
+import { PLACE } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 import { SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
@@ -127,8 +128,7 @@ async function Deliveries({ searchParams }: Pick<PageProps<"/deliveries">, "sear
             id: true,
             shopName: true,
             contactName: true,
-            region: { select: { name: true } },
-            district: { select: { name: true } },
+            ...PLACE,
           },
         })
       : [],
@@ -161,8 +161,8 @@ async function Deliveries({ searchParams }: Pick<PageProps<"/deliveries">, "sear
                   dealers={dealers.sort(byDealerName).map((dealer) => ({
                     id: dealer.id,
                     name: dealerName(dealer),
-                    place: dealer.region
-                      ? [dealer.district?.name, dealer.region.name].filter(Boolean).join(", ")
+                    place: dealer.district
+                      ? [dealer.district.name, dealer.district.region.name].join(", ")
                       : null,
                   }))}
                 />
