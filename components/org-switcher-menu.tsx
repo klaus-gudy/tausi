@@ -43,6 +43,30 @@ export function OrgSwitcherMenu({
     })
   }
 
+  const label = (
+    <>
+      <OrgMark name={active?.name ?? "?"} />
+      <div className="grid flex-1 text-left text-sm leading-tight">
+        <span className="truncate font-semibold">
+          {active?.name ?? "No organization"}
+        </span>
+        <span className="truncate text-xs text-muted-foreground">
+          {active ? active.roleName : "Pick one below"}
+        </span>
+      </div>
+    </>
+  )
+
+  // Nothing to switch to (a single organization, already active): show it
+  // without the menu.
+  if (!organizations.some((org) => org.id !== activeId)) {
+    return (
+      <SidebarMenuButton size="lg" asChild className="hover:bg-transparent active:bg-transparent">
+        <div>{label}</div>
+      </SidebarMenuButton>
+    )
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -51,15 +75,7 @@ export function OrgSwitcherMenu({
           disabled={pending}
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
-          <OrgMark name={active?.name ?? "?"} />
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">
-              {active?.name ?? "No organization"}
-            </span>
-            <span className="truncate text-xs text-muted-foreground">
-              {active ? active.roleName : "Pick one below"}
-            </span>
-          </div>
+          {label}
           <ChevronsUpDown className="ml-auto" />
         </SidebarMenuButton>
       </DropdownMenuTrigger>
