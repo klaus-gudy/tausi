@@ -89,7 +89,6 @@ async function Warehouses({
           where: { organizationId, status: "active" },
           select: {
             id: true,
-            name: true,
             phone: true,
             user: { select: { name: true, email: true } },
             role: { select: { name: true } },
@@ -100,7 +99,7 @@ async function Warehouses({
   const keepers: Keeper[] = memberships
     .map((row) => ({
       id: row.id,
-      name: row.name || row.user.name || row.user.email,
+      name: row.user.name || row.user.email,
       phone: row.phone,
       role: row.role.name,
     }))
