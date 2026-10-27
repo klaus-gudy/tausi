@@ -6,6 +6,7 @@ import { BackLink } from "../back-link";
 import { receiptLines } from "../receipts";
 import { DetailHeader } from "@/components/detail-header";
 import { NoAccessState } from "@/components/no-access-state";
+import { ProductName } from "@/components/product-name";
 import { NotFoundState } from "@/components/not-found-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,8 +129,8 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
               {lines.map((line) => (
                 <TableRow key={line.id} className={line.reversed ? "text-muted-foreground" : undefined}>
                   <TableCell>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{line.product.name}</span>
+                    <div className="flex items-center gap-2">
+                      <ProductName name={line.product.name} className="font-medium" />
                       {line.reversed ? <Badge variant="outline">Reversed</Badge> : null}
                     </div>
                     <div className="text-xs text-muted-foreground">{line.product.code}</div>
