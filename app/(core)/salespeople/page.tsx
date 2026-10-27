@@ -189,7 +189,6 @@ async function Salespeople({
                                 email: membership.user.email,
                                 phone: membership.phone,
                                 ...covers.keys,
-                                notes: salesperson.notes,
                               }}
                               places={places}
                               inactive={tab === "inactive"}
