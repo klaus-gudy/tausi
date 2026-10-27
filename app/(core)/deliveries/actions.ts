@@ -35,10 +35,7 @@ function revalidateDeliveries() {
   revalidatePath("/super-dealers");
 }
 
-/**
- * Confirms the stock of a transfer reached the salesperson. A transfer still
- * marked in transit is marked arrived at the same time.
- */
+/** Confirms the stock of a transfer marked arrived reached the salesperson. */
 export async function acknowledgeTransfer(id: string): Promise<ActionResult> {
   const member = await memberWith("deliveries.record");
   if (!member) return notAllowed;
@@ -56,25 +53,19 @@ export async function acknowledgeTransfer(id: string): Promise<ActionResult> {
     if (!transfer) return { message: "That transfer no longer exists." };
     const name = transferNumber(transfer.number);
     if (transfer.acknowledgedAt) return { message: `You already acknowledged ${name}.` };
-    if (transfer.status !== "in_transit" && transfer.status !== "arrived") {
-      return {
-        message:
-          transfer.status === "cancelled"
-            ? `${name} was cancelled.`
-            : `${name} hasn't left the store yet.`,
-      };
+    if (transfer.status !== "arrived") {
+      const why = {
+        initiated: "hasn't left the store yet",
+        in_transit: "is still on its way. Acknowledge it once it's marked arrived",
+        cancelled: "was cancelled",
+      }[transfer.status];
+      return { message: `${name} ${why}.` };
     }
 
     // The status is part of the condition, so a change in between is caught.
     const { count } = await tx.stockTransfer.updateMany({
-      where: { id, status: transfer.status, acknowledgedAt: null },
-      data: {
-        acknowledgedAt: now,
-        acknowledgedById: member.userId,
-        ...(transfer.status === "in_transit"
-          ? { status: "arrived" as const, arrivedAt: now, arrivedById: member.userId }
-          : {}),
-      },
+      where: { id, status: "arrived", acknowledgedAt: null },
+      data: { acknowledgedAt: now, acknowledgedById: member.userId },
     });
     if (!count) return { message: `${name} changed in the meantime. Reload and try again.` };
     return { success: true, message: `${name} acknowledged. Its stock is with you now.` };
