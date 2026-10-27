@@ -1,5 +1,6 @@
 import type { Prisma } from "@/lib/generated/prisma/client"
 import { getPrisma } from "@/lib/prisma"
+import { syncSalesperson } from "@/lib/salespeople"
 import { createToken, hashToken } from "@/lib/tokens"
 
 const INVITATION_DAYS = 7
@@ -51,6 +52,8 @@ export async function createInvitation(
         data: { organizationId, userId, roleId, phone, invitedById, status: "invited" },
         select: { id: true },
       })).id
+  // Invited with the Salesperson role, they're a salesperson from now on.
+  await syncSalesperson(tx, membershipId)
 
   const { token, tokenHash } = createToken()
   await tx.invitation.updateMany({
