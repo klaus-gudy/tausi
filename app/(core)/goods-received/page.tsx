@@ -6,8 +6,8 @@ import { PackagePlus } from "lucide-react";
 
 import { ReceiveStockDialog } from "../stock/stock-dialogs";
 import { receiptLines } from "./receipts";
-import { LoadMore } from "@/components/load-more";
 import { NoAccessState } from "@/components/no-access-state";
+import { TablePagination } from "@/components/table-pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Empty,
@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table";
 import { formatCount, formatDay } from "@/lib/format";
 import { activeWarehouses, stockOnHand } from "@/lib/inventory";
-import { shownCount } from "@/lib/list-size";
+import { currentPage } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   title: "Goods received",
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 export default function GoodsReceivedPage({ searchParams }: PageProps<"/goods-received">) {
   return (
@@ -59,17 +59,18 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
   if (!member) return <NoAccessState reason="no-organization" />;
   if (!member.permissions.has("stock.read")) return <NoAccessState reason="no-permission" />;
 
-  const shown = shownCount((await searchParams).show, PAGE_SIZE);
   const organizationId = member.organization.id;
   const canReceive = member.permissions.has("stock.receive");
 
   const prisma = getPrisma();
-  const [total, receipts, products, warehouses, onHand] = await Promise.all([
-    prisma.stockReceipt.count({ where: { organizationId } }),
+  const total = await prisma.stockReceipt.count({ where: { organizationId } });
+  const page = currentPage((await searchParams).page, total, PAGE_SIZE);
+  const [receipts, products, warehouses, onHand] = await Promise.all([
     prisma.stockReceipt.findMany({
       where: { organizationId },
       orderBy: [{ receivedOn: "desc" }, { createdAt: "desc" }],
-      take: shown,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
       select: {
         id: true,
         supplierName: true,
@@ -158,7 +159,7 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
                 })}
               </TableBody>
             </Table>
-            <LoadMore shown={shown} total={total} pageSize={PAGE_SIZE} />
+            <TablePagination page={page} total={total} pageSize={PAGE_SIZE} />
           </CardContent>
         </Card>
       ) : (
