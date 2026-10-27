@@ -1,6 +1,7 @@
 import type { Prisma } from "@/lib/generated/prisma/client"
 import type { ActiveMember } from "@/lib/membership"
 import { getPrisma } from "@/lib/prisma"
+import { SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople"
 
 // What salespeople hold and supply. Shared by the deliveries, salespeople and
 // super dealers pages. Like stock on hand, what a salesperson holds is never
@@ -11,12 +12,13 @@ export function deliveryNumber(number: number) {
   return `DL-${String(number).padStart(4, "0")}`
 }
 
-/** The active salesperson the signed-in member is linked to, if any. */
-export function readOwnSalesperson(member: ActiveMember) {
-  return getPrisma().salesperson.findFirst({
-    where: { organizationId: member.organization.id, userId: member.userId, deactivatedAt: null },
-    select: { id: true, name: true },
+/** The signed-in member's salesperson record, if they're an active salesperson. */
+export async function readOwnSalesperson(member: ActiveMember) {
+  const salesperson = await getPrisma().salesperson.findFirst({
+    where: { membershipId: member.membershipId, deactivatedAt: null },
+    select: { id: true, ...SALESPERSON_PERSON },
   })
+  return salesperson && { id: salesperson.id, name: salespersonName(salesperson) }
 }
 
 /**
