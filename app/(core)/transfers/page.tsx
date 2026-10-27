@@ -6,8 +6,8 @@ import { ArrowLeftRight } from "lucide-react";
 import { InitiateTransferDialog } from "./transfer-dialog";
 import { TransferMenu } from "./transfer-menu";
 import { TransferTimeline, type TimelineStep } from "./transfer-timeline";
-import { LoadMore } from "@/components/load-more";
 import { NoAccessState } from "@/components/no-access-state";
+import { TablePagination } from "@/components/table-pagination";
 import { UrlTabs } from "@/components/url-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,7 +31,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import type { StockTransferStatus } from "@/lib/generated/prisma/client";
 import { formatCount, formatDate, formatTime } from "@/lib/format";
 import { activeWarehouses, stockByWarehouse } from "@/lib/inventory";
-import { shownCount } from "@/lib/list-size";
+import { currentPage } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   title: "Transfers",
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 const TABS = {
   initiated: ["initiated"],
@@ -103,22 +103,29 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
   const tab: Tab = typeof params.tab === "string" && Object.hasOwn(TABS, params.tab) ? (params.tab as Tab) : "initiated";
   // Transfers still on their way can be moved along or cancelled.
   const isOpen = tab === "initiated" || tab === "in_transit";
-  const shown = shownCount(params.show, PAGE_SIZE);
   const canTransfer = member.permissions.has("stock.transfer");
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [counts, transfers, products, warehouses, stock, salespeople] = await Promise.all([
-    prisma.stockTransfer.groupBy({
-      by: ["status"],
-      where: { organizationId },
-      _count: { _all: true },
-    }),
+  const counts = await prisma.stockTransfer.groupBy({
+    by: ["status"],
+    where: { organizationId },
+    _count: { _all: true },
+  });
+  const count = (statuses: StockTransferStatus[]) =>
+    counts
+      .filter((row) => statuses.includes(row.status))
+      .reduce((sum, row) => sum + row._count._all, 0);
+  const total = count(TABS[tab]);
+  const page = currentPage(params.page, total, PAGE_SIZE);
+
+  const [transfers, products, warehouses, stock, salespeople] = await Promise.all([
     prisma.stockTransfer.findMany({
       where: { organizationId, status: { in: TABS[tab] } },
       // Open transfers oldest first, so the ones waiting longest are on top.
       orderBy: isOpen ? { number: "asc" } : { number: "desc" },
-      take: shown,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
       select: {
         id: true,
         number: true,
@@ -161,12 +168,6 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
         })
       : [],
   ]);
-  const count = (statuses: StockTransferStatus[]) =>
-    counts
-      .filter((row) => statuses.includes(row.status))
-      .reduce((sum, row) => sum + row._count._all, 0);
-  const total = count(TABS[tab]);
-
   return (
     <UrlTabs
       defaultValue={tab}
@@ -291,7 +292,12 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                   })}
                 </TableBody>
               </Table>
-              <LoadMore shown={shown} total={total} pageSize={PAGE_SIZE} params={{ tab }} />
+              <TablePagination
+                page={page}
+                total={total}
+                pageSize={PAGE_SIZE}
+                params={tab === "initiated" ? {} : { tab }}
+              />
             </CardContent>
           </Card>
         ) : (
