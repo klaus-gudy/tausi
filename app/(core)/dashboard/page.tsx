@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CircleAlert, Minus } from "lucide-react";
 
 import { SupplyChart } from "./supply-chart";
+import { ProductName } from "@/components/product-name";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -194,7 +195,7 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
                   {low.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell>
-                        <span className="font-medium">{product.name}</span>
+                        <ProductName name={product.name} className="font-medium" />
                         {product.size ? <span className="text-muted-foreground"> {product.size}</span> : null}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{formatCount(product.onHand)}</TableCell>
