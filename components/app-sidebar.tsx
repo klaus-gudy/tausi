@@ -63,13 +63,13 @@ const navGroups: {
         permission: ["deliveries.read", "deliveries.record"],
       },
       { title: "Salespeople", href: "/salespeople", icon: UserCheck, permission: "salespeople.read" },
+      { title: "Super dealers", href: "/super-dealers", icon: Store, permission: "dealers.read" },
     ],
   },
   {
     label: "Catalogue",
     items: [
       { title: "Products", href: "/products", icon: Package, permission: "products.read" },
-      { title: "Super dealers", href: "/super-dealers", icon: Store, permission: "dealers.read" },
       { title: "Zones", href: "/zones", icon: MapPinned, permission: "dealers.read" },
       { title: "Warehouses", href: "/warehouses", icon: Warehouse, permission: "warehouses.read" },
     ],
