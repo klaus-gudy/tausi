@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
+import { dealerScope } from "@/lib/dealer-access";
 import { byDealerName, dealerName, formatPhone } from "@/lib/dealers";
 import { formatCount, formatDay } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
@@ -65,11 +66,14 @@ async function SuperDealers({
   const tab = (await searchParams).tab === "inactive" ? "inactive" : "active";
   const canManage = member.permissions.has("dealers.manage");
   const organizationId = member.organization.id;
+  // Without dealers.read_all, only the dealers where they work.
+  const scope = await dealerScope(member);
+  const coversAll = member.permissions.has("dealers.read_all");
 
   const prisma = getPrisma();
   const [dealers, activeCount, inactiveCount, issuedTotals, lastIssues, delivered, places] = await Promise.all([
     prisma.superDealer.findMany({
-      where: { organizationId, deactivatedAt: tab === "inactive" ? { not: null } : null },
+      where: { ...scope, deactivatedAt: tab === "inactive" ? { not: null } : null },
       select: {
         id: true,
         shopName: true,
@@ -83,8 +87,8 @@ async function SuperDealers({
         ...PLACE,
       },
     }),
-    prisma.superDealer.count({ where: { organizationId, deactivatedAt: null } }),
-    prisma.superDealer.count({ where: { organizationId, deactivatedAt: { not: null } } }),
+    prisma.superDealer.count({ where: { ...scope, deactivatedAt: null } }),
+    prisma.superDealer.count({ where: { ...scope, deactivatedAt: { not: null } } }),
     // What each dealer holds; reversals of an issue net out of the sum.
     prisma.stockMovement.groupBy({
       by: ["superDealerId"],
@@ -216,7 +220,9 @@ async function SuperDealers({
               <EmptyDescription>
                 {tab === "inactive"
                   ? "Inactive dealers keep their history but can't be issued stock."
-                  : "Add the shops and distributors you issue stock to."}
+                  : coversAll
+                    ? "Add the shops and distributors you issue stock to."
+                    : "Dealers in the zone, region or district you cover show here."}
               </EmptyDescription>
             </EmptyHeader>
             {tab === "active" && canManage ? (
