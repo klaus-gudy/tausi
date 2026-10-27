@@ -50,6 +50,8 @@ export const metadata: Metadata = {
 // A product is running low when it lasts fewer days than this at its recent pace.
 const LOW_DAYS = 14;
 const URGENT_DAYS = 7;
+// Rows each list shows before saying how many more there are.
+const LIST_ROWS = 6;
 
 export default function DashboardPage() {
   return (
@@ -117,11 +119,11 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
   ]);
   const held = showSalespeople ? await heldStock(organizationId) : new Map<string, Map<string, number>>();
 
-  const low = store.products
+  const allLow = store.products
     .filter((product) => product.daysLeft !== null && product.daysLeft < LOW_DAYS)
-    .sort((a, b) => a.daysLeft! - b.daysLeft!)
-    .slice(0, 6);
-  const quiet = supply.quietDealerIds.slice(0, 6);
+    .sort((a, b) => a.daysLeft! - b.daysLeft!);
+  const low = allLow.slice(0, LIST_ROWS);
+  const quiet = supply.quietDealerIds.slice(0, LIST_ROWS);
   const quietDealers = quiet.length
     ? await prisma.superDealer.findMany({
         where: { id: { in: quiet.map((dealer) => dealer.id) } },
@@ -217,6 +219,7 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
                 Every product that moved lately has at least {LOW_DAYS} days of stock.
               </p>
             )}
+            <Shown shown={low.length} total={allLow.length} />
           </CardContent>
         </Card>
 
@@ -245,7 +248,7 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stuck.slice(0, 6).map((transfer) => (
+                  {stuck.slice(0, LIST_ROWS).map((transfer) => (
                     <TableRow key={transfer.id}>
                       <TableCell className="font-medium">{transferNumber(transfer.number)}</TableCell>
                       <TableCell>{salespersonName(transfer.salesperson)}</TableCell>
@@ -262,6 +265,7 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
             ) : (
               <p className="text-sm text-muted-foreground">No transfers are held up.</p>
             )}
+            <Shown shown={Math.min(stuck.length, LIST_ROWS)} total={stuck.length} />
           </CardContent>
         </Card>
       </div>
@@ -353,6 +357,7 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
                 Every dealer supplied before got stock in the last {WINDOW_DAYS} days.
               </p>
             )}
+            <Shown shown={quiet.length} total={supply.quietDealerIds.length} />
           </CardContent>
         </Card>
       </div>
@@ -465,6 +470,16 @@ function Trend({ delta }: { delta: number }) {
         {delta}% vs the {WINDOW_DAYS} days before
       </span>
     </div>
+  );
+}
+
+/** "Showing 6 of 9." under a list that was cut short; nothing otherwise. */
+function Shown({ shown, total }: { shown: number; total: number }) {
+  if (total <= shown) return null;
+  return (
+    <p className="mt-3 text-sm text-muted-foreground">
+      Showing {formatCount(shown)} of {formatCount(total)}.
+    </p>
   );
 }
 
