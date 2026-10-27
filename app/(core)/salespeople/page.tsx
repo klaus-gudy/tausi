@@ -156,10 +156,11 @@ async function Salespeople({
                             </div>
                           ) : null}
                         </TableCell>
-                        <TableCell className="hidden text-muted-foreground md:table-cell">
-                          {[membership.phone && formatPhone(membership.phone), membership.user.email]
-                            .filter(Boolean)
-                            .join(" · ") || "—"}
+                        <TableCell className="hidden md:table-cell">
+                          <div>{membership.user.email}</div>
+                          {membership.phone ? (
+                            <div className="text-xs text-muted-foreground">{formatPhone(membership.phone)}</div>
+                          ) : null}
                         </TableCell>
                         <TableCell className="hidden text-muted-foreground sm:table-cell">
                           {zone?.name ?? "—"}
