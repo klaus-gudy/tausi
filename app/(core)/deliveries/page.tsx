@@ -352,8 +352,6 @@ async function DeliveryList({
       id: true,
       number: true,
       deliveredOn: true,
-      reference: true,
-      note: true,
       salesperson: { select: SALESPERSON_PERSON },
       superDealer: { select: { shopName: true, contactName: true } },
       lines: {
@@ -399,19 +397,11 @@ async function DeliveryList({
                 <TableCell className="whitespace-nowrap">{formatDay(delivery.deliveredOn)}</TableCell>
                 <TableCell>
                   <div className="font-medium">{deliveryNumber(delivery.number)}</div>
-                  {delivery.reference ? (
-                    <div className="text-xs text-muted-foreground">{delivery.reference}</div>
-                  ) : null}
                 </TableCell>
                 {salespersonId ? null : <TableCell>{salespersonName(delivery.salesperson)}</TableCell>}
                 <TableCell>{dealerName(delivery.superDealer)}</TableCell>
                 <TableCell className="hidden md:table-cell">
                   <ProductList lines={delivery.lines} />
-                  {delivery.note ? (
-                    <div className="mt-1 max-w-xs truncate text-xs text-muted-foreground">
-                      {delivery.note}
-                    </div>
-                  ) : null}
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
                   {formatCount(delivery.lines.reduce((sum, line) => sum + line.quantity, 0))}
