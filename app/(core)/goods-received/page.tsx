@@ -104,7 +104,7 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
   return (
     <>
       {canReceive && products.length ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex justify-end">
           <ReceiveStockDialog
             products={products.map((product) => ({ ...product, onHand: onHand.get(product.id) ?? 0 }))}
             warehouses={warehouses}
