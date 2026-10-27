@@ -7,6 +7,7 @@ import { AcknowledgeButton } from "./acknowledge-button";
 import { RecordDeliveryDialog } from "./delivery-dialog";
 import type { StockProduct } from "../stock/stock-dialogs";
 import { NoAccessState } from "@/components/no-access-state";
+import { ProductName } from "@/components/product-name";
 import { TablePagination } from "@/components/table-pagination";
 import { UrlTabs } from "@/components/url-tabs";
 import { Badge } from "@/components/ui/badge";
@@ -307,7 +308,7 @@ function StockInHand({ products }: { products: StockProduct[] }) {
             {products.map((product) => (
               <TableRow key={product.id}>
                 <TableCell>
-                  <div className="font-medium">{product.name}</div>
+                  <ProductName name={product.name} className="block font-medium" />
                   <div className="text-xs text-muted-foreground">{product.code}</div>
                 </TableCell>
                 <TableCell className="hidden text-muted-foreground sm:table-cell">
@@ -438,7 +439,7 @@ function ProductList({
     <ul className="text-sm">
       {lines.map((line) => (
         <li key={line.id}>
-          {formatCount(line.quantity)} × {line.product.name}
+          {formatCount(line.quantity)} × <ProductName name={line.product.name} />
           {line.product.size ? <span className="text-muted-foreground"> {line.product.size}</span> : null}
         </li>
       ))}
