@@ -39,3 +39,36 @@ export async function releaseSalesperson(tx: Prisma.TransactionClient, membershi
   await tx.salesperson.delete({ where: { id: salesperson.id } })
   return null
 }
+
+/** The role that makes a member a salesperson. Role keys never change once made. */
+export const SALESPERSON_ROLE = "salesperson"
+
+/**
+ * Keeps a member's salesperson record in step with their role: anyone with
+ * the Salesperson role has one, nobody else does. A record with transfers or
+ * deliveries is deactivated rather than deleted, and comes back if they get
+ * the role again. Run inside the transaction that sets the role.
+ */
+export async function syncSalesperson(tx: Prisma.TransactionClient, membershipId: string) {
+  const membership = await tx.membership.findUniqueOrThrow({
+    where: { id: membershipId },
+    select: {
+      organizationId: true,
+      role: { select: { key: true } },
+      salesperson: { select: { id: true, deactivatedAt: true } },
+    },
+  })
+  const { organizationId, role, salesperson } = membership
+  if (role.key === SALESPERSON_ROLE) {
+    if (!salesperson) await tx.salesperson.create({ data: { organizationId, membershipId } })
+    else if (salesperson.deactivatedAt) {
+      await tx.salesperson.update({ where: { id: salesperson.id }, data: { deactivatedAt: null } })
+    }
+  } else if (salesperson) {
+    // Deleted when it has no history; otherwise it stops being active instead.
+    const kept = await releaseSalesperson(tx, membershipId)
+    if (kept && !salesperson.deactivatedAt) {
+      await tx.salesperson.update({ where: { id: salesperson.id }, data: { deactivatedAt: new Date() } })
+    }
+  }
+}
