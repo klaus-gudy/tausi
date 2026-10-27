@@ -3,8 +3,8 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { History } from "lucide-react";
 
-import { LoadMore } from "@/components/load-more";
 import { NoAccessState } from "@/components/no-access-state";
+import { TablePagination } from "@/components/table-pagination";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -26,7 +26,7 @@ import {
 import type { StockMovementType } from "@/lib/generated/prisma/client";
 import { dealerName } from "@/lib/dealers";
 import { formatDate, formatSigned, formatTime } from "@/lib/format";
-import { shownCount } from "@/lib/list-size";
+import { pageNumber } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 import { transferNumber } from "@/lib/transfers";
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   title: "Movement history",
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 // Stock coming in stands out, stock going out is quieter, the rest is plain.
 const TYPE_BADGES: Partial<Record<StockMovementType, "default" | "secondary">> = {
@@ -77,12 +77,14 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
   // The warehouses' side of each move; an issue's dealer side mirrors it.
   const where = { organizationId: member.organization.id, holder: "warehouse" as const };
   const prisma = getPrisma();
-  const shown = shownCount((await searchParams).show, PAGE_SIZE);
   const total = await prisma.stockMovement.count({ where });
+  // A page past the end shows the last one.
+  const page = Math.min(pageNumber((await searchParams).page), Math.max(1, Math.ceil(total / PAGE_SIZE)));
   const movements = await prisma.stockMovement.findMany({
     where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: shown,
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
     select: {
       id: true,
       type: true,
@@ -184,7 +186,7 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
             })}
           </TableBody>
         </Table>
-        <LoadMore shown={shown} total={total} pageSize={PAGE_SIZE} />
+        <TablePagination page={page} total={total} pageSize={PAGE_SIZE} />
       </CardContent>
     </Card>
   );
