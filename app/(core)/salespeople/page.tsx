@@ -7,6 +7,7 @@ import { AddSalespersonDialog } from "./salesperson-dialog";
 import { SalespersonMenu } from "./salesperson-menu";
 import { NoAccessState } from "@/components/no-access-state";
 import { UrlTabs } from "@/components/url-tabs";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Empty,
@@ -31,6 +32,7 @@ import { heldStock } from "@/lib/deliveries";
 import { formatCount } from "@/lib/format";
 import { assignableRoles, readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
+import { BY_NAME, SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 
 export const metadata: Metadata = {
   title: "Salespeople",
@@ -67,21 +69,16 @@ async function Salespeople({
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [salespeople, activeCount, inactiveCount, onTheWay, held, supplied, zones, members, roles] = await Promise.all([
+  const [salespeople, activeCount, inactiveCount, onTheWay, held, supplied, zones, roles] = await Promise.all([
     prisma.salesperson.findMany({
       where: { organizationId, deactivatedAt: tab === "inactive" ? { not: null } : null },
-      orderBy: { name: "asc" },
+      orderBy: BY_NAME,
       select: {
         id: true,
-        name: true,
-        phone: true,
-        email: true,
         zoneKey: true,
-        userId: true,
         notes: true,
         zone: { select: { name: true } },
-        user: { select: { name: true, email: true } },
-        invitation: { select: { status: true, expiresAt: true } },
+        ...SALESPERSON_PERSON,
       },
     }),
     prisma.salesperson.count({ where: { organizationId, deactivatedAt: null } }),
@@ -107,23 +104,12 @@ async function Salespeople({
           orderBy: { position: "asc" },
           select: { key: true, name: true },
         }) : [],
-    canManage
-      ? prisma.membership.findMany({
-          where: { organizationId, status: "active" },
-          orderBy: { user: { email: "asc" } },
-          select: { user: { select: { id: true, name: true, email: true } } },
-        })
-      : [],
     canAdd ? assignableRoles(member) : [],
   ]);
   const sum = (rows: { salesperson_id: string; units: bigint }[], id: string) =>
     Number(rows.find((row) => row.salesperson_id === id)?.units ?? 0);
   const holding = (id: string) =>
     [...(held.get(id)?.values() ?? [])].reduce((total, units) => total + units, 0);
-  const logins = members.map(({ user }) => ({
-    userId: user.id,
-    label: user.name ? `${user.name} (${user.email})` : user.email,
-  }));
 
   return (
     <UrlTabs
@@ -156,19 +142,14 @@ async function Salespeople({
                 </TableHeader>
                 <TableBody>
                   {salespeople.map((salesperson) => {
-                    const { zone, user, invitation, ...editable } = salesperson;
-                    const invited =
-                      invitation?.status === "pending" && invitation.expiresAt > new Date();
+                    const { membership, zone } = salesperson;
+                    const name = salespersonName(salesperson);
                     return (
                       <TableRow key={salesperson.id}>
                         <TableCell>
-                          <div className="font-medium">{salesperson.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {user
-                              ? `Signs in as ${user.email}`
-                              : invited
-                                ? "Invited, hasn't joined yet"
-                                : "No login"}
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{name}</span>
+                            {membership.status === "invited" ? <Badge variant="outline">Invited</Badge> : null}
                           </div>
                           {salesperson.notes ? (
                             <div className="max-w-xs truncate text-xs text-muted-foreground">
@@ -177,7 +158,7 @@ async function Salespeople({
                           ) : null}
                         </TableCell>
                         <TableCell className="hidden text-muted-foreground md:table-cell">
-                          {[salesperson.phone && formatPhone(salesperson.phone), salesperson.email]
+                          {[membership.phone && formatPhone(membership.phone), membership.user.email]
                             .filter(Boolean)
                             .join(" · ") || "—"}
                         </TableCell>
@@ -196,9 +177,15 @@ async function Salespeople({
                         {canManage ? (
                           <TableCell>
                             <SalespersonMenu
-                              salesperson={editable}
+                              salesperson={{
+                                id: salesperson.id,
+                                name: membership.user.name ?? "",
+                                email: membership.user.email,
+                                phone: membership.phone,
+                                zoneKey: salesperson.zoneKey,
+                                notes: salesperson.notes,
+                              }}
                               zones={zones}
-                              logins={logins}
                               inactive={tab === "inactive"}
                             />
                           </TableCell>
