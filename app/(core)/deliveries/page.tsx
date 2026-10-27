@@ -10,7 +10,7 @@ import { NoAccessState } from "@/components/no-access-state";
 import { TablePagination } from "@/components/table-pagination";
 import { UrlTabs } from "@/components/url-tabs";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Empty,
   EmptyDescription,
@@ -216,11 +216,6 @@ function Incoming({
 
   return (
     <Card>
-      <CardHeader>
-        <CardDescription>
-          Acknowledge each transfer once you have the stock in hand. Only then can you supply it.
-        </CardDescription>
-      </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
