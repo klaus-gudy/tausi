@@ -30,7 +30,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import { formatPhone } from "@/lib/dealers";
 import { heldStock } from "@/lib/deliveries";
 import { formatCount } from "@/lib/format";
-import { assignableRoles, readActiveMember } from "@/lib/membership";
+import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 import { BY_NAME, SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 
@@ -69,7 +69,7 @@ async function Salespeople({
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [salespeople, activeCount, inactiveCount, onTheWay, held, supplied, zones, roles] = await Promise.all([
+  const [salespeople, activeCount, inactiveCount, onTheWay, held, supplied, zones] = await Promise.all([
     prisma.salesperson.findMany({
       where: { organizationId, deactivatedAt: tab === "inactive" ? { not: null } : null },
       orderBy: BY_NAME,
@@ -104,7 +104,6 @@ async function Salespeople({
           orderBy: { position: "asc" },
           select: { key: true, name: true },
         }) : [],
-    canAdd ? assignableRoles(member) : [],
   ]);
   const sum = (rows: { salesperson_id: string; units: bigint }[], id: string) =>
     Number(rows.find((row) => row.salesperson_id === id)?.units ?? 0);
@@ -118,7 +117,7 @@ async function Salespeople({
         { value: "active", label: "Active", count: activeCount },
         { value: "inactive", label: "Inactive", count: inactiveCount },
       ]}
-      actions={canAdd ? { active: <AddSalespersonDialog zones={zones} roles={roles} /> } : undefined}
+      actions={canAdd ? { active: <AddSalespersonDialog zones={zones} /> } : undefined}
     >
       <TabsContent value={tab}>
         {salespeople.length ? (
@@ -214,7 +213,7 @@ async function Salespeople({
             </EmptyHeader>
             {tab === "active" && canAdd ? (
               <EmptyContent>
-                <AddSalespersonDialog zones={zones} roles={roles} />
+                <AddSalespersonDialog zones={zones} />
               </EmptyContent>
             ) : null}
           </Empty>
