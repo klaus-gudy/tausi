@@ -1,13 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ClipboardCheck, PackagePlus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { adjustStock, receiveStock } from "./actions";
+import { addSupplier, adjustStock, receiveStock, type Supplier } from "./actions";
 import { DatePicker } from "@/components/date-picker";
 import { Button } from "@/components/ui/button";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxSeparator,
+} from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -247,16 +256,140 @@ export function WarehouseField({
   );
 }
 
+/** A supplier on the list, or the name typed in offered to be added. */
+type SupplierOption = Supplier & { isNew?: boolean };
+
+/** Lowercase with spaces collapsed, for comparing supplier names. */
+const supplierKey = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
+
+/**
+ * The receive form's supplier picker; submits supplierId. Typing a name
+ * that isn't on the list offers to add it, as the last option. Left empty,
+ * the receipt is filed under "Manufactured".
+ */
+function SupplierField({
+  id,
+  suppliers: initialSuppliers,
+  onAddingChange,
+}: {
+  id: string;
+  suppliers: Supplier[];
+  onAddingChange: (adding: boolean) => void;
+}) {
+  const [suppliers, setSuppliers] = useState(initialSuppliers);
+  const [value, setValue] = useState<Supplier | null>(null);
+  const [query, setQuery] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const typed = query.trim().replace(/\s+/g, " ");
+  const match = suppliers.find((supplier) => supplierKey(supplier.name) === supplierKey(typed));
+  // While the input shows the pick, the whole list is offered again.
+  const shown =
+    value && query === value.name
+      ? suppliers
+      : suppliers.filter((supplier) => supplierKey(supplier.name).includes(supplierKey(typed)));
+  const options: SupplierOption[] =
+    typed && !match ? [...shown, { id: "", name: typed, isNew: true }] : shown;
+
+  async function add(name: string) {
+    setAdding(true);
+    onAddingChange(true);
+    try {
+      const result = await addSupplier(name);
+      if (!result.supplier) {
+        toast.error(result.message);
+        setQuery(value?.name ?? "");
+        return;
+      }
+      const supplier = result.supplier;
+      toast.success(result.message);
+      setSuppliers((current) =>
+        current.some((other) => other.id === supplier.id)
+          ? current
+          : [...current, supplier].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setValue(supplier);
+      setQuery(supplier.name);
+    } finally {
+      setAdding(false);
+      onAddingChange(false);
+    }
+  }
+
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>Supplier</FieldLabel>
+      <input type="hidden" name="supplierId" value={value?.id ?? ""} />
+      <Combobox<SupplierOption>
+        items={options}
+        filteredItems={options}
+        value={value}
+        onValueChange={(next) => {
+          if (next?.isNew) void add(next.name);
+          else setValue(next);
+        }}
+        inputValue={query}
+        onInputValueChange={setQuery}
+        onOpenChange={(open, details) => {
+          if (open || details.reason === "item-press") return;
+          // Leaving the field settles what was typed: a supplier's name picks
+          // it, anything else goes back to the last pick.
+          if (!typed) setValue(null);
+          else if (match) {
+            setValue(match);
+            setQuery(match.name);
+          } else setQuery(value?.name ?? "");
+        }}
+        itemToStringLabel={(option) => option.name}
+        isItemEqualToValue={(option, other) => option.id === other.id && !option.isNew}
+      >
+        <ComboboxInput
+          id={id}
+          className="w-full"
+          placeholder="Manufactured"
+          autoComplete="off"
+          maxLength={200}
+          disabled={adding}
+        />
+        <ComboboxContent>
+          <ComboboxEmpty>Type a name to add a supplier.</ComboboxEmpty>
+          <ComboboxList>
+            {(option: SupplierOption) =>
+              option.isNew ? (
+                <Fragment key="new">
+                  {shown.length ? <ComboboxSeparator /> : null}
+                  <ComboboxItem value={option}>
+                    <Plus />
+                    Add &ldquo;{option.name}&rdquo;
+                  </ComboboxItem>
+                </Fragment>
+              ) : (
+                <ComboboxItem key={option.id} value={option}>
+                  {option.name}
+                </ComboboxItem>
+              )
+            }
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+    </Field>
+  );
+}
+
 export function ReceiveStockDialog({
   products,
   warehouses,
+  suppliers,
 }: {
   products: StockProduct[];
   warehouses: StockWarehouse[];
+  suppliers: Supplier[];
 }) {
   return (
     <FormDialog label="Receive stock" icon={<PackagePlus data-icon="inline-start" />}>
-      {(close) => <ReceiveForm products={products} warehouses={warehouses} onDone={close} />}
+      {(close) => (
+        <ReceiveForm products={products} warehouses={warehouses} suppliers={suppliers} onDone={close} />
+      )}
     </FormDialog>
   );
 }
@@ -264,14 +397,17 @@ export function ReceiveStockDialog({
 function ReceiveForm({
   products,
   warehouses,
+  suppliers,
   onDone,
 }: {
   products: StockProduct[];
   warehouses: StockWarehouse[];
+  suppliers: Supplier[];
   onDone: () => void;
 }) {
   const [state, onSubmit, pending] = useDialogAction(receiveStock, onDone);
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
+  const [addingSupplier, setAddingSupplier] = useState(false);
   const day = today();
 
   return (
@@ -288,10 +424,11 @@ function ReceiveForm({
           onChange={setWarehouseId}
         />
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="receive-supplier">Supplier</FieldLabel>
-            <Input id="receive-supplier" name="supplier" autoComplete="off" maxLength={200} />
-          </Field>
+          <SupplierField
+            id="receive-supplier"
+            suppliers={suppliers}
+            onAddingChange={setAddingSupplier}
+          />
           <Field>
             <FieldLabel htmlFor="receive-day">Received on</FieldLabel>
             <DatePicker id="receive-day" name="occurredOn" defaultValue={day} maxDate={day} />
@@ -301,7 +438,7 @@ function ReceiveForm({
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
-        <Button type="submit" disabled={pending || !warehouseId}>
+        <Button type="submit" disabled={pending || addingSupplier || !warehouseId}>
           {pending ? "Recording…" : "Record receipt"}
         </Button>
       </DialogFooter>
