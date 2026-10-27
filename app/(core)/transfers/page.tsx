@@ -132,8 +132,6 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
         id: true,
         number: true,
         status: true,
-        reference: true,
-        note: true,
         createdAt: true,
         dispatchedAt: true,
         arrivedAt: true,
@@ -230,9 +228,6 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                         </TableCell>
                         <TableCell className="hidden whitespace-nowrap sm:table-cell">
                           <div className="font-medium">{name}</div>
-                          {transfer.reference ? (
-                            <div className="text-xs text-muted-foreground">{transfer.reference}</div>
-                          ) : null}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">{transfer.warehouse.name}</TableCell>
                         <TableCell>
@@ -254,11 +249,6 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                               </li>
                             ))}
                           </ul>
-                          {transfer.note ? (
-                            <div className="mt-1 max-w-xs truncate text-xs text-muted-foreground">
-                              {transfer.note}
-                            </div>
-                          ) : null}
                         </TableCell>
                         <TableCell className="text-right font-medium tabular-nums">
                           {formatCount(units)}
