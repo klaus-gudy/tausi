@@ -4,8 +4,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   ArrowLeftRight,
-  Boxes,
-  ClipboardCheck,
   History,
   LayoutDashboard,
   MapPinned,
@@ -50,10 +48,8 @@ const navGroups: {
   {
     label: "Inventory",
     items: [
-      { title: "Stock on hand", href: "/stock-on-hand", icon: Boxes, permission: "products.read" },
       { title: "Goods received", href: "/goods-received", icon: PackagePlus, permission: "stock.read" },
       { title: "Transfers", href: "/transfers", icon: ArrowLeftRight, permission: "stock.read" },
-      { title: "Stock counts", href: "/stock-counts", icon: ClipboardCheck, permission: "stock.read" },
       { title: "Movement history", href: "/movement-history", icon: History, permission: "stock.read" },
     ],
   },
