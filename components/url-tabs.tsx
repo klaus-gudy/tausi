@@ -42,14 +42,17 @@ export function UrlTabs({
       className={className}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <TabsList className="h-9">
-          {tabs.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className="px-2.5">
-              {tab.label}
-              {tab.count !== undefined && <CountBadge count={tab.count} />}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        {/* On a phone, more tabs than fit scroll sideways instead of widening the page. */}
+        <div className="max-w-full overflow-x-auto [scrollbar-width:none]">
+          <TabsList className="h-9">
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value} className="px-2.5">
+                {tab.label}
+                {tab.count !== undefined && <CountBadge count={tab.count} />}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
         {actions?.[value]}
       </div>
       {children}
