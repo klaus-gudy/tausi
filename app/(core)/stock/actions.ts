@@ -19,6 +19,7 @@ import {
 } from "@/lib/inventory";
 import { formatCount } from "@/lib/format";
 import { getPrisma } from "@/lib/prisma";
+import { pickedSupplier } from "@/lib/suppliers";
 
 // Every change to stock is a new stock_movements row; nothing here edits or
 // deletes one. Anything that removes stock locks the products first and
@@ -51,6 +52,8 @@ export async function receiveStock(
   const prisma = getPrisma();
   const warehouse = await pickedWarehouse(organizationId, formData.get("warehouseId"));
   if ("message" in warehouse) return warehouse;
+  const supplier = await pickedSupplier(organizationId, formData.get("supplierId"));
+  if ("message" in supplier) return supplier;
   const products = await prisma.product.findMany({
     where: { organizationId, id: { in: lines.map((line) => line.productId) } },
     select: { id: true, name: true, archivedAt: true },
@@ -67,7 +70,7 @@ export async function receiveStock(
     data: {
       organizationId,
       warehouseId: warehouse.id,
-      supplierName: readText(formData.get("supplier")),
+      supplierId: supplier.id,
       reference: readText(formData.get("reference"), 100),
       note: readText(formData.get("note"), 1000),
       receivedOn: occurredOn,
