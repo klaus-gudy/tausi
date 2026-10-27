@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
 import type { StockTransferStatus } from "@/lib/generated/prisma/client";
-import { formatCount, formatDate, formatDay } from "@/lib/format";
+import { formatCount, formatDate } from "@/lib/format";
 import { activeWarehouses, stockByWarehouse } from "@/lib/inventory";
 import { shownCount } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
@@ -124,7 +124,6 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
         status: true,
         reference: true,
         note: true,
-        initiatedOn: true,
         createdAt: true,
         dispatchedAt: true,
         arrivedAt: true,
@@ -202,11 +201,13 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Transfer</TableHead>
-                    <TableHead>Salesperson</TableHead>
+                    <TableHead>Created at</TableHead>
+                    <TableHead className="hidden sm:table-cell">From</TableHead>
+                    <TableHead>To</TableHead>
                     <TableHead className="hidden md:table-cell">Products</TableHead>
                     <TableHead className="text-right">Units</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="hidden lg:table-cell">Initiated by</TableHead>
                     {canTransfer && isOpen ? (
                       <TableHead className="w-10">
                         <span className="sr-only">Actions</span>
@@ -220,14 +221,14 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                     const name = transferNumber(transfer.number);
                     return (
                       <TableRow key={transfer.id} className="align-top">
-                        <TableCell>
-                          <div className="font-medium">{name}</div>
+                        <TableCell className="whitespace-nowrap">
+                          <div className="font-medium">{formatDate(transfer.createdAt)}</div>
                           <div className="text-xs text-muted-foreground">
-                            {formatDay(transfer.initiatedOn)}
+                            {name}
                             {transfer.reference ? ` · ${transfer.reference}` : ""}
                           </div>
-                          <div className="text-xs text-muted-foreground">From {transfer.warehouse.name}</div>
                         </TableCell>
+                        <TableCell className="hidden sm:table-cell">{transfer.warehouse.name}</TableCell>
                         <TableCell>
                           <div>{transfer.salesperson.name}</div>
                           {transfer.salesperson.zone ? (
@@ -263,6 +264,9 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                               : TRANSFER_STATUS_LABELS[transfer.status]}
                           </Badge>
                           <Steps transfer={transfer} />
+                        </TableCell>
+                        <TableCell className="hidden text-muted-foreground lg:table-cell">
+                          {transfer.createdBy?.name || transfer.createdBy?.email || "—"}
                         </TableCell>
                         {canTransfer && isOpen ? (
                           <TableCell>
@@ -303,17 +307,15 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
 
 type Person = { name: string | null; email: string } | null;
 
-/** Who did each step and when, under the status badge. */
+/** Who did each step after initiating it and when, under the status badge. */
 function Steps({
   transfer,
 }: {
   transfer: {
-    createdAt: Date;
     dispatchedAt: Date | null;
     arrivedAt: Date | null;
     cancelledAt: Date | null;
     acknowledgedAt: Date | null;
-    createdBy: Person;
     dispatchedBy: Person;
     arrivedBy: Person;
     cancelledBy: Person;
@@ -322,7 +324,6 @@ function Steps({
 }) {
   const who = (person: Person) => (person ? ` by ${person.name || person.email}` : "");
   const steps = [
-    { label: "Initiated", at: transfer.createdAt, by: transfer.createdBy },
     { label: "Dispatched", at: transfer.dispatchedAt, by: transfer.dispatchedBy },
     { label: "Arrived", at: transfer.arrivedAt, by: transfer.arrivedBy },
     { label: "Acknowledged", at: transfer.acknowledgedAt, by: transfer.acknowledgedBy },
