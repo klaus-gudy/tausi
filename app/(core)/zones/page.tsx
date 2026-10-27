@@ -3,6 +3,13 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { MapPinned } from "lucide-react";
 
+import {
+  MobileCard,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -114,7 +121,31 @@ async function Zones() {
   return (
     <Card>
       <CardContent>
-        <Table>
+        <MobileCards>
+          {rows.map((zone) => (
+            <MobileCard key={zone.key}>
+              <MobileCardHeader
+                title={zone.name}
+                description={`${zone.regions.length} ${zone.regions.length === 1 ? "region" : "regions"}`}
+              />
+              <p className="text-muted-foreground">{zone.regions.map((region) => region.name).join(", ")}</p>
+              <MobileCardFields>
+                <MobileCardField label="Salespeople">
+                  <span className="tabular-nums">{formatCount(zone.salespeople)}</span>
+                </MobileCardField>
+                <MobileCardField label="Super dealers">
+                  <span className="tabular-nums">{formatCount(zone.dealers)}</span>
+                </MobileCardField>
+              </MobileCardFields>
+            </MobileCard>
+          ))}
+        </MobileCards>
+        {/* The table's totals row, for the cards. */}
+        <p className="pt-3 text-sm text-muted-foreground @4xl/main:hidden">
+          {rows.length} zones · {formatCount(total((row) => row.salespeople))} salespeople ·{" "}
+          {formatCount(total((row) => row.dealers))} super dealers
+        </p>
+        <Table className="hidden @4xl/main:table">
           <TableHeader>
             <TableRow>
               <TableHead>Zone</TableHead>
