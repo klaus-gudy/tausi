@@ -203,7 +203,6 @@ export async function signUp(
     const organization = await createOrganizationWithOwner(tx, {
       name: organizationName,
       userId,
-      withPlaces: formData.get("withPlaces") === "on",
     });
     return { userId, organizationId: organization.id };
   }).catch((error: unknown) => {
