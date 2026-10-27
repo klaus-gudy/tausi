@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto"
 import type { Prisma } from "@/lib/generated/prisma/client"
 import { seedPlaces } from "@/lib/places"
 import { getPrisma } from "@/lib/prisma"
+import { defaultSupplier } from "@/lib/suppliers"
 
 export const MAX_ORGANIZATION_NAME = 100
 
@@ -58,8 +59,9 @@ const STARTER_ROLES = [
 ]
 
 /**
- * Creates an organization with the user as its owner, the starter roles and
- * Tanzania's zones, regions and districts. Run inside a transaction.
+ * Creates an organization with the user as its owner, the starter roles,
+ * Tanzania's zones, regions and districts, and the "Manufactured" supplier.
+ * Run inside a transaction.
  */
 export async function createOrganizationWithOwner(
   tx: Prisma.TransactionClient,
@@ -91,5 +93,6 @@ export async function createOrganizationWithOwner(
   }
   // Every organization works with the same zones, so they're there from the start.
   await seedPlaces(tx, organization.id)
+  await defaultSupplier(organization.id, tx)
   return organization
 }
