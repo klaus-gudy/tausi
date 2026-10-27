@@ -2,10 +2,19 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Package, Truck, UserX } from "lucide-react";
+import { cn } from "cn";
 
 import { AcknowledgeButton } from "./acknowledge-button";
 import { RecordDeliveryDialog } from "./delivery-dialog";
 import type { StockProduct } from "../stock/stock-dialogs";
+import {
+  MobileCard,
+  MobileCardActions,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { ProductName } from "@/components/product-name";
 import { TablePagination } from "@/components/table-pagination";
@@ -218,7 +227,42 @@ function Incoming({
   return (
     <Card>
       <CardContent>
-        <Table>
+        <MobileCards>
+          {transfers.map((transfer) => {
+            const name = transferNumber(transfer.number);
+            return (
+              <MobileCard key={transfer.id}>
+                <MobileCardHeader
+                  title={name}
+                  badge={
+                    <Badge variant={transfer.status === "initiated" ? "outline" : "secondary"}>
+                      {TRANSFER_STATUS_LABELS[transfer.status]}
+                    </Badge>
+                  }
+                  description={
+                    transfer.dispatchedAt
+                      ? `Dispatched ${formatDate(transfer.dispatchedAt)}, ${formatTime(transfer.dispatchedAt)}`
+                      : "Not dispatched yet"
+                  }
+                />
+                <ProductList
+                  lines={transfer.movements.map((line) => ({ ...line, quantity: -line.quantity }))}
+                  className="text-muted-foreground"
+                />
+                <MobileCardActions>
+                  {transfer.status === "arrived" ? (
+                    <AcknowledgeButton id={transfer.id} name={name} />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {transfer.status === "initiated" ? "Still at the store" : "On its way"}
+                    </span>
+                  )}
+                </MobileCardActions>
+              </MobileCard>
+            );
+          })}
+        </MobileCards>
+        <Table className="hidden @4xl/main:table">
           <TableHeader>
             <TableRow>
               <TableHead>Dispatched at</TableHead>
@@ -295,7 +339,18 @@ function StockInHand({ products }: { products: StockProduct[] }) {
   return (
     <Card>
       <CardContent>
-        <Table>
+        <MobileCards>
+          {products.map((product) => (
+            <MobileCard key={product.id}>
+              <MobileCardHeader
+                title={product.name}
+                description={[product.size, product.code].filter(Boolean).join(" · ")}
+                aside={<span className="font-medium tabular-nums">{formatCount(product.onHand)}</span>}
+              />
+            </MobileCard>
+          ))}
+        </MobileCards>
+        <Table className="hidden @4xl/main:table">
           <TableHeader>
             <TableRow>
               <TableHead>Product</TableHead>
@@ -387,7 +442,28 @@ async function DeliveryList({
   return (
     <Card>
       <CardContent>
-        <Table>
+        <MobileCards>
+          {deliveries.map((delivery) => (
+            <MobileCard key={delivery.id}>
+              <MobileCardHeader
+                title={dealerName(delivery.superDealer)}
+                description={`${deliveryNumber(delivery.number)} · ${formatDay(delivery.deliveredOn)}`}
+                aside={
+                  <span className="font-medium tabular-nums">
+                    {formatCount(delivery.lines.reduce((sum, line) => sum + line.quantity, 0))} units
+                  </span>
+                }
+              />
+              {salespersonId ? null : (
+                <MobileCardFields>
+                  <MobileCardField label="Salesperson">{salespersonName(delivery.salesperson)}</MobileCardField>
+                </MobileCardFields>
+              )}
+              <ProductList lines={delivery.lines} className="text-muted-foreground" />
+            </MobileCard>
+          ))}
+        </MobileCards>
+        <Table className="hidden @4xl/main:table">
           <TableHeader>
             <TableRow>
               <TableHead>Delivered on</TableHead>
@@ -425,11 +501,13 @@ async function DeliveryList({
 
 function ProductList({
   lines,
+  className,
 }: {
   lines: { id: string; quantity: number; product: { name: string; size: string | null } }[];
+  className?: string;
 }) {
   return (
-    <ul className="text-sm">
+    <ul className={cn("text-sm", className)}>
       {lines.map((line) => (
         <li key={line.id}>
           {formatCount(line.quantity)} × <ProductName name={line.product.name} />
