@@ -326,25 +326,17 @@ function ReceiveForm({
           value={warehouseId}
           onChange={setWarehouseId}
         />
-        <div className="grid gap-5 sm:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="receive-supplier">Supplier</FieldLabel>
             <Input id="receive-supplier" name="supplier" autoComplete="off" maxLength={200} />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="receive-reference">Delivery note / invoice</FieldLabel>
-            <Input id="receive-reference" name="reference" autoComplete="off" maxLength={100} />
           </Field>
           <Field>
             <FieldLabel htmlFor="receive-day">Received on</FieldLabel>
             <DatePicker id="receive-day" name="occurredOn" defaultValue={day} maxDate={day} />
           </Field>
         </div>
-        <ProductLines products={products} withCost showOnHand={false} />
-        <Field>
-          <FieldLabel htmlFor="receive-note">Note</FieldLabel>
-          <Textarea id="receive-note" name="note" maxLength={1000} rows={2} />
-        </Field>
+        <ProductLines products={products} withCost={false} showOnHand={false} />
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
