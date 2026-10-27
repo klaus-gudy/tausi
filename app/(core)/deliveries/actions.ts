@@ -13,7 +13,6 @@ import {
   plural,
   readDay,
   readLines,
-  readText,
   sumLines,
   type ActionResult,
 } from "@/lib/inventory";
@@ -92,8 +91,6 @@ export async function recordDelivery(
   const lines = readLines(formData, false);
   if (typeof lines === "string") return { message: lines };
   const wanted = sumLines(lines);
-  const reference = readText(formData.get("reference"), 100);
-  const note = readText(formData.get("note"), 1000);
 
   const organizationId = member.organization.id;
   const attempt = () =>
@@ -138,8 +135,6 @@ export async function recordDelivery(
           salespersonId: salesperson.id,
           superDealerId,
           deliveredOn,
-          reference,
-          note,
           createdById: member.userId,
           lines: { create: [...wanted].map(([productId, quantity]) => ({ productId, quantity })) },
         },
