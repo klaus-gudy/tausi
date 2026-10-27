@@ -31,7 +31,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import { byDealerName, dealerName, formatPhone } from "@/lib/dealers";
 import { formatCount, formatDay } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
-import { readPlaces } from "@/lib/places";
+import { PLACE, placeKeys, readPlaces } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -76,14 +76,11 @@ async function SuperDealers({
         contactName: true,
         phone: true,
         email: true,
-        regionKey: true,
-        districtKey: true,
         address: true,
         tin: true,
         businessLicence: true,
         signedAt: true,
-        region: { select: { name: true, zone: { select: { name: true } } } },
-        district: { select: { name: true } },
+        ...PLACE,
       },
     }),
     prisma.superDealer.count({ where: { organizationId, deactivatedAt: null } }),
@@ -152,7 +149,9 @@ async function SuperDealers({
                 <TableBody>
                   {dealers.map((dealer) => {
                     const last = lastIssued.get(dealer.id);
-                    const { region, district, signedAt, ...editable } = dealer;
+                    const { district, signedAt, ...rest } = dealer;
+                    const region = district?.region;
+                    const editable = { ...rest, ...placeKeys(dealer) };
                     return (
                       <TableRow key={dealer.id}>
                         <TableCell>
