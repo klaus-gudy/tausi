@@ -30,6 +30,7 @@ import { formatCount } from "@/lib/format";
 import { stockByWarehouse, stockInTransit } from "@/lib/inventory";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
+import { BY_NAME, SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 
 export const metadata: Metadata = {
   title: "Stock on hand",
@@ -77,11 +78,13 @@ async function StockOnHand({ searchParams }: Pick<PageProps<"/stock-on-hand">, "
       select: { id: true, name: true, deactivatedAt: true },
     }),
     canSeeSalespeople
-      ? prisma.salesperson.findMany({
-          where: { organizationId },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true },
-        })
+      ? prisma.salesperson
+          .findMany({
+            where: { organizationId },
+            orderBy: BY_NAME,
+            select: { id: true, ...SALESPERSON_PERSON },
+          })
+          .then((rows) => rows.map((row) => ({ id: row.id, name: salespersonName(row) })))
       : [],
     stockByWarehouse(organizationId),
     stockInTransit(organizationId),
