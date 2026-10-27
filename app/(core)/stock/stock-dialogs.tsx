@@ -30,6 +30,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupText } from "@/components/ui/input-group";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCount } from "@/lib/format";
 import { useFormAction } from "@/hooks/use-form-action";
@@ -257,21 +264,24 @@ export function WarehouseField({
   return (
     <Field>
       <FieldLabel htmlFor={id}>Warehouse</FieldLabel>
-      <NativeSelect
-        id={id}
-        name="warehouseId"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full"
-        required
-      >
-        {warehouses.map((warehouse) => (
-          <NativeSelectOption key={warehouse.id} value={warehouse.id}>
-            {warehouse.name}
-            {stock ? ` · ${formatCount(unitsIn(stock, warehouse.id))} units on hand` : ""}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
+      <input type="hidden" name="warehouseId" value={value} />
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder="Pick a warehouse" />
+        </SelectTrigger>
+        <SelectContent>
+          {warehouses.map((warehouse) => (
+            <SelectItem key={warehouse.id} value={warehouse.id}>
+              {warehouse.name}
+              {stock ? (
+                <span className="text-muted-foreground">
+                  {formatCount(unitsIn(stock, warehouse.id))} units on hand
+                </span>
+              ) : null}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </Field>
   );
 }
