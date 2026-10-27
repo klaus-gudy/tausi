@@ -12,7 +12,6 @@ import {
   type SignUpState,
 } from "../actions";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -24,7 +23,6 @@ import {
   Field,
   FieldDescription,
   FieldError,
-  FieldContent,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
@@ -44,8 +42,6 @@ export function SignUpForm({ invitation }: { invitation: Invitation | null }) {
   // Bumped to remount step 1, so it shows takenMessage instead of its old result.
   const [organizationKey, setOrganizationKey] = useState(0);
   const [draftName, setDraftName] = useState("");
-  // Start the organization with Tanzania's zones, regions and districts.
-  const [withPlaces, setWithPlaces] = useState(true);
 
   if (!invited && organization === null) {
     return (
@@ -53,8 +49,6 @@ export function SignUpForm({ invitation }: { invitation: Invitation | null }) {
         key={organizationKey}
         defaultName={draftName}
         message={takenMessage}
-        withPlaces={withPlaces}
-        onWithPlacesChange={setWithPlaces}
         onAvailable={(name) => {
           setDraftName(name);
           setTakenMessage("");
@@ -67,7 +61,6 @@ export function SignUpForm({ invitation }: { invitation: Invitation | null }) {
   return (
     <AccountStep
       organization={organization}
-      withPlaces={withPlaces}
       invitation={invitation}
       next={next}
       onBack={(message = "") => {
@@ -84,14 +77,10 @@ const initialCheck: OrganizationCheck = { message: "" };
 function OrganizationStep({
   defaultName,
   message,
-  withPlaces,
-  onWithPlacesChange,
   onAvailable,
 }: {
   defaultName: string;
   message: string;
-  withPlaces: boolean;
-  onWithPlacesChange: (withPlaces: boolean) => void;
   onAvailable: (name: string) => void;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -130,19 +119,6 @@ function OrganizationStep({
                 required
               />
               {error ? <FieldError>{error}</FieldError> : null}
-            </Field>
-            <Field orientation="horizontal">
-              <Checkbox
-                id="with-places"
-                checked={withPlaces}
-                onCheckedChange={(checked) => onWithPlacesChange(checked === true)}
-              />
-              <FieldContent>
-                <FieldLabel htmlFor="with-places">Add Tanzania&apos;s locations</FieldLabel>
-                <FieldDescription>
-                  Its 8 zones, 31 regions and 150 districts, ready for placing dealers.
-                </FieldDescription>
-              </FieldContent>
             </Field>
             <Field>
               <Button type="submit" disabled={pending}>
@@ -190,13 +166,11 @@ function AccountIntro({
 
 function AccountStep({
   organization,
-  withPlaces,
   invitation,
   next,
   onBack,
 }: {
   organization: string | null;
-  withPlaces: boolean;
   invitation: Invitation | null;
   next: string | null;
   onBack: (message?: string) => void;
@@ -227,9 +201,6 @@ function AccountStep({
           {next ? <input type="hidden" name="next" value={next} /> : null}
           {organization ? (
             <input type="hidden" name="organization" value={organization} />
-          ) : null}
-          {organization && withPlaces ? (
-            <input type="hidden" name="withPlaces" value="on" />
           ) : null}
           <FieldGroup>
             <Field>
