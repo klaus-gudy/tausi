@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { dealerScope } from "@/lib/dealer-access";
 import { dealerName, formatPhone } from "@/lib/dealers";
 import { formatDate } from "@/lib/format";
 import { isUuid } from "@/lib/inventory";
@@ -49,7 +50,7 @@ async function Dealer({ params }: Pick<PageProps<"/super-dealers/[id]">, "params
   const { id } = await params;
   const dealer = isUuid(id)
     ? await getPrisma().superDealer.findFirst({
-        where: { id, organizationId: member.organization.id },
+        where: { ...(await dealerScope(member)), id },
         select: {
           id: true,
           shopName: true,
