@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { canPlaceDealer, dealerScope } from "@/lib/dealer-access";
 import { dealerName, normalizePhone, normalizeTin } from "@/lib/dealers";
 import { isEmail } from "@/lib/email";
 import {
@@ -57,6 +58,9 @@ async function readDealer(formData: FormData, organizationId: string) {
   };
 }
 
+// Without dealers.read_all a dealer outside their area would vanish from their list.
+const outsideCoverage: ActionResult = { message: "Pick a district in the zone, region or district you cover." };
+
 function revalidateDealers() {
   revalidatePath("/super-dealers");
   revalidatePath("/movement-history");
@@ -76,11 +80,15 @@ export async function saveSuperDealer(
   const organizationId = member.organization.id;
   const data = await readDealer(formData, organizationId);
   if (typeof data === "string") return { message: data };
+  if (!(await canPlaceDealer(member, data.districtId))) return outsideCoverage;
 
   const name = dealerName(data);
   try {
     if (id) {
-      const { count } = await prisma.superDealer.updateMany({ where: { id, organizationId }, data });
+      const { count } = await prisma.superDealer.updateMany({
+        where: { ...(await dealerScope(member)), id },
+        data,
+      });
       if (!count) return { message: "That dealer no longer exists." };
     } else {
       await prisma.superDealer.create({ data: { ...data, organizationId } });
@@ -118,6 +126,7 @@ export async function onboardSuperDealer(
 
   const data = await readDealer(formData, member.organization.id);
   if (typeof data === "string") return { message: data };
+  if (!(await canPlaceDealer(member, data.districtId))) return outsideCoverage;
 
   // Both coordinates or neither; the phone fills them in.
   const latitude = Number(formData.get("latitude") || Number.NaN);
@@ -163,7 +172,7 @@ export async function setSuperDealerActive(id: string, active: boolean): Promise
   if (!member) return notAllowed;
 
   const { count } = await getPrisma().superDealer.updateMany({
-    where: { id, organizationId: member.organization.id },
+    where: { ...(await dealerScope(member)), id },
     data: { deactivatedAt: active ? null : new Date() },
   });
   if (!count) return { message: "That dealer no longer exists." };
