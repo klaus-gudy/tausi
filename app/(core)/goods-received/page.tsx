@@ -127,6 +127,9 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
               <TableBody>
                 {receipts.map((receipt) => {
                   const { lines, units } = receiptLines(receipt.stockMovements);
+                  const summary = lines
+                    .map((line) => `${line.product.name} × ${formatCount(line.quantity)}`)
+                    .join(", ");
                   const href = `/goods-received/${receipt.id}`;
                   return (
                     <TableRow key={receipt.id} className="relative">
@@ -138,9 +141,9 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
                       <TableCell>
                         <div className="font-medium">{receipt.supplierName ?? "No supplier given"}</div>
                       </TableCell>
-                      <TableCell className="hidden max-w-xs whitespace-normal md:table-cell">
-                        <div className="line-clamp-2">
-                          {lines.map((line) => `${line.product.name} × ${formatCount(line.quantity)}`).join(", ")}
+                      <TableCell className="hidden max-w-xs md:table-cell">
+                        <div className="truncate" title={summary}>
+                          {summary}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {lines.length} {lines.length === 1 ? "product" : "products"}
