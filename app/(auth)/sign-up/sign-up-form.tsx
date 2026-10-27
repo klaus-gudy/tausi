@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-type Invitation = { email: string; organizationName: string; roleName: string };
+// name is what they were invited as; they can change it here.
+type Invitation = { email: string; name: string | null; organizationName: string; roleName: string };
 
 // Two steps: claim an organization name, then create the account that owns
 // it. Someone arriving from an invitation link skips step 1: signing up
@@ -210,7 +211,7 @@ function AccountStep({
                 name="name"
                 autoComplete="name"
                 placeholder="Jane Doe"
-                defaultValue={state.name}
+                defaultValue={state.name ?? invitation?.name ?? undefined}
                 autoFocus
                 required
               />
