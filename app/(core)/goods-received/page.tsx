@@ -27,15 +27,13 @@ import {
 } from "@/components/ui/table";
 import { formatCount, formatDay } from "@/lib/format";
 import { activeWarehouses, stockOnHand } from "@/lib/inventory";
-import { currentPage } from "@/lib/list-size";
+import { currentPage, pageSize } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Goods received",
 };
-
-const PAGE_SIZE = 25;
 
 export default function GoodsReceivedPage({ searchParams }: PageProps<"/goods-received">) {
   return (
@@ -64,13 +62,15 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
 
   const prisma = getPrisma();
   const total = await prisma.stockReceipt.count({ where: { organizationId } });
-  const page = currentPage((await searchParams).page, total, PAGE_SIZE);
+  const params = await searchParams;
+  const size = pageSize(params.size);
+  const page = currentPage(params.page, total, size);
   const [receipts, products, warehouses, suppliers, onHand] = await Promise.all([
     prisma.stockReceipt.findMany({
       where: { organizationId },
       orderBy: [{ receivedOn: "desc" }, { createdAt: "desc" }],
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      skip: (page - 1) * size,
+      take: size,
       select: {
         id: true,
         supplier: { select: { name: true } },
@@ -170,7 +170,7 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
                 })}
               </TableBody>
             </Table>
-            <TablePagination page={page} total={total} pageSize={PAGE_SIZE} />
+            <TablePagination page={page} total={total} pageSize={size} />
           </CardContent>
         </Card>
       ) : (
