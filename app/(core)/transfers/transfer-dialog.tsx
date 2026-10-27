@@ -1,6 +1,6 @@
 "use client";
 
-import { Send } from "lucide-react";
+import { Package, Route, Send } from "lucide-react";
 
 import { initiateTransfer } from "./actions";
 import { useState } from "react";
@@ -18,6 +18,7 @@ import {
   type StockWarehouse,
 } from "../stock/stock-dialogs";
 import { DatePicker } from "@/components/date-picker";
+import { FormSection } from "@/components/form-section";
 import { Button } from "@/components/ui/button";
 import {
   DialogDescription,
@@ -32,7 +33,6 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -40,7 +40,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 
 export type TransferSalesperson = { id: string; name: string; zone: string | null };
 
@@ -102,60 +101,51 @@ function TransferForm({
           when it leaves, and arrived when the salesperson has it.
         </DialogDescription>
       </DialogHeader>
-      <FieldGroup className="py-4">
-        <WarehouseField
-          id="transfer-warehouse"
-          warehouses={warehouses}
-          value={warehouseId}
-          onChange={setWarehouseId}
-          stock={stock}
-        />
-        <div className="grid gap-5 sm:grid-cols-3">
-          <Field>
-            <FieldLabel htmlFor="transfer-salesperson">Salesperson</FieldLabel>
-            <input type="hidden" name="salespersonId" value={salespersonId} />
-            <Select value={salespersonId} onValueChange={setSalespersonId}>
-              <SelectTrigger id="transfer-salesperson" className="w-full">
-                <SelectValue placeholder="Pick a salesperson" />
-              </SelectTrigger>
-              <SelectContent>
-                {salespeople.map((salesperson) => (
-                  <SelectItem key={salesperson.id} value={salesperson.id}>
-                    {salesperson.name}
-                    {salesperson.zone ? (
-                      <span className="text-muted-foreground">{salesperson.zone}</span>
-                    ) : null}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="transfer-reference">Dispatch note / vehicle</FieldLabel>
-            <Input
-              id="transfer-reference"
-              name="reference"
-              placeholder="T 123 ABC"
-              autoComplete="off"
-              maxLength={100}
+      <FieldGroup className="gap-4 py-4">
+        <FormSection icon={Route} title="From and to" description="The warehouse it leaves and who it goes to.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <WarehouseField
+              id="transfer-warehouse"
+              warehouses={warehouses}
+              value={warehouseId}
+              onChange={setWarehouseId}
+              stock={stock}
             />
-          </Field>
+            <Field>
+              <FieldLabel htmlFor="transfer-salesperson">Salesperson</FieldLabel>
+              <input type="hidden" name="salespersonId" value={salespersonId} />
+              <Select value={salespersonId} onValueChange={setSalespersonId}>
+                <SelectTrigger id="transfer-salesperson" className="w-full">
+                  <SelectValue placeholder="Pick a salesperson" />
+                </SelectTrigger>
+                <SelectContent>
+                  {salespeople.map((salesperson) => (
+                    <SelectItem key={salesperson.id} value={salesperson.id}>
+                      {salesperson.name}
+                      {salesperson.zone ? (
+                        <span className="text-muted-foreground">{salesperson.zone}</span>
+                      ) : null}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
           <Field>
             <FieldLabel htmlFor="transfer-day">Picked on</FieldLabel>
             <DatePicker id="transfer-day" name="initiatedOn" defaultValue={day} maxDate={day} />
           </Field>
-        </div>
-        {inStock.length ? (
-          // Lines picked from one warehouse don't carry over to another.
-          <ProductLines key={warehouseId} products={inStock} showOnHand />
-        ) : null}
-        {!inStock.length && warehouse ? (
-          <FieldDescription>Nothing is on hand in {warehouse.name} to send. Receive stock first.</FieldDescription>
-        ) : null}
-        <Field>
-          <FieldLabel htmlFor="transfer-note">Note</FieldLabel>
-          <Textarea id="transfer-note" name="note" maxLength={1000} rows={2} />
-        </Field>
+        </FormSection>
+        <FormSection icon={Package} title="Stock to send" description="What's going, from what the warehouse has on hand.">
+          {inStock.length ? (
+            // Lines picked from one warehouse don't carry over to another.
+            <ProductLines key={warehouseId} products={inStock} showOnHand />
+          ) : (
+            <FieldDescription>
+              {warehouse ? `Nothing is on hand in ${warehouse.name} to send. Receive stock first.` : "Pick a warehouse first."}
+            </FieldDescription>
+          )}
+        </FormSection>
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
