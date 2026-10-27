@@ -19,6 +19,7 @@ import {
   type ActionResult,
 } from "@/lib/inventory";
 import { getPrisma } from "@/lib/prisma";
+import { SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
 
 // A transfer moves through initiated → in transit → arrived. Its stock comes
@@ -56,11 +57,11 @@ export async function initiateTransfer(
     getPrisma().$transaction(async (tx): Promise<ActionResult> => {
       const salesperson = await tx.salesperson.findFirst({
         where: { id: salespersonId, organizationId },
-        select: { name: true, deactivatedAt: true },
+        select: { deactivatedAt: true, ...SALESPERSON_PERSON },
       });
       if (!salesperson) return { message: "That salesperson no longer exists." };
       if (salesperson.deactivatedAt) {
-        return { message: `${salesperson.name} is inactive. Reactivate them first.` };
+        return { message: `${salespersonName(salesperson)} is inactive. Reactivate them first.` };
       }
 
       const warehouse = await pickedWarehouse(organizationId, formData.get("warehouseId"), tx);
@@ -110,7 +111,7 @@ export async function initiateTransfer(
       const units = [...wanted.values()].reduce((sum, quantity) => sum + quantity, 0);
       return {
         success: true,
-        message: `${transferNumber(number)}: ${plural(units, "unit")} for ${salesperson.name} taken off stock.`,
+        message: `${transferNumber(number)}: ${plural(units, "unit")} for ${salespersonName(salesperson)} taken off stock.`,
       };
     });
 
