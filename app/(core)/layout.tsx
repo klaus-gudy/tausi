@@ -42,7 +42,8 @@ export default function CoreLayout({ children }: LayoutProps<"/">) {
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
+        {/* @container/main: lists switch between a table and cards (MobileCards) on this width. */}
+        <div className="@container/main flex flex-1 flex-col gap-4 p-4">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );
