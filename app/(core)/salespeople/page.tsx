@@ -5,6 +5,13 @@ import { UserCheck } from "lucide-react";
 
 import { AddSalespersonDialog } from "./salesperson-dialog";
 import { SalespersonMenu } from "./salesperson-menu";
+import {
+  MobileCard,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { UrlTabs } from "@/components/url-tabs";
 import { Badge } from "@/components/ui/badge";
@@ -119,7 +126,50 @@ async function Salespeople({
         {salespeople.length ? (
           <Card>
             <CardContent>
-              <Table>
+              <MobileCards>
+                {salespeople.map((salesperson) => {
+                  const { membership } = salesperson;
+                  const covers = coverage(salesperson);
+                  return (
+                    <MobileCard key={salesperson.id}>
+                      <MobileCardHeader
+                        title={salespersonName(salesperson)}
+                        badge={membership.status === "invited" ? <Badge variant="outline">Invited</Badge> : undefined}
+                        description={[covers.place, covers.zone?.name].filter(Boolean).join(" · ") || "No coverage yet"}
+                        aside={
+                          canManage ? (
+                            <SalespersonMenu
+                              salesperson={{
+                                id: salesperson.id,
+                                name: membership.user.name ?? "",
+                                email: membership.user.email,
+                                phone: membership.phone,
+                                ...covers.keys,
+                              }}
+                              places={places}
+                              inactive={tab === "inactive"}
+                            />
+                          ) : undefined
+                        }
+                      />
+                      <MobileCardFields>
+                        <MobileCardField label="Holding">
+                          <span className="font-medium tabular-nums">{formatCount(holding(salesperson.id))}</span>
+                        </MobileCardField>
+                        <MobileCardField label="On the way">
+                          <span className="tabular-nums">{formatCount(sum(onTheWay, salesperson.id))}</span>
+                        </MobileCardField>
+                        <MobileCardField label="Supplied">
+                          <span className="tabular-nums">{formatCount(sum(supplied, salesperson.id))}</span>
+                        </MobileCardField>
+                        {membership.phone ? <MobileCardField label="Phone">{formatPhone(membership.phone)}</MobileCardField> : null}
+                        <MobileCardField label="Email">{membership.user.email}</MobileCardField>
+                      </MobileCardFields>
+                    </MobileCard>
+                  );
+                })}
+              </MobileCards>
+              <Table className="hidden @4xl/main:table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Salesperson</TableHead>
