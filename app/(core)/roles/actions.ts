@@ -149,7 +149,9 @@ export async function deleteRole(id: string): Promise<ActionResult> {
     select: {
       name: true,
       permissions: { select: { permissionKey: true } },
-      _count: { select: { memberships: true, invitations: { where: { status: "pending" } } } },
+      // Invited members hold the role too; they're cleared by revoking their invitation.
+      _count: { select: { memberships: { where: { status: { not: "invited" } } } } },
+      memberships: { where: { status: "invited" }, select: { id: true }, take: 1 },
     },
   });
   if (!role) return { message: "That role no longer exists." };
@@ -157,13 +159,10 @@ export async function deleteRole(id: string): Promise<ActionResult> {
     return { message: "Only someone with every permission of this role can delete it." };
   }
   if (role._count.memberships) return { message: `Give the members with ${role.name} another role first.` };
-  if (role._count.invitations) return { message: `Revoke the pending invitations for ${role.name} first.` };
+  if (role.memberships.length) return { message: `Revoke the pending invitations for ${role.name} first.` };
 
   try {
-    await prisma.$transaction([
-      prisma.invitation.deleteMany({ where: { roleId: id, organizationId, status: { not: "pending" } } }),
-      prisma.role.delete({ where: { id } }),
-    ]);
+    await prisma.role.delete({ where: { id } });
   } catch (error) {
     // Someone was given the role, or invited with it, after the check above.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
