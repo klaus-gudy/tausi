@@ -48,7 +48,9 @@ const STARTER_ROLES = [
     permissions: [
       "products.read",
       "warehouses.read",
+      "zones.read",
       "dealers.read",
+      "dealers.read_all",
       "salespeople.read",
       "stock.read",
       "stock.receive",
