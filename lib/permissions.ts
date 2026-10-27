@@ -35,12 +35,20 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     ],
   },
   {
+    key: "zones",
+    label: "Zones",
+    description: "The zones, regions and districts the organization works in.",
+    read: "zones.read",
+    permissions: [{ key: "zones.read", label: "View zones with their salespeople and dealers" }],
+  },
+  {
     key: "dealers",
     label: "Super dealers",
     description: "The shops and distributors stock is issued to.",
     read: "dealers.read",
     permissions: [
-      { key: "dealers.read", label: "View super dealers" },
+      { key: "dealers.read", label: "View super dealers in the zone, region or district you cover" },
+      { key: "dealers.read_all", label: "View super dealers in every zone" },
       { key: "dealers.manage", label: "Add, edit and deactivate super dealers" },
       { key: "dealers.onboard", label: "Sign up new super dealers in person, with their signature" },
     ],
