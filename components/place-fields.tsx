@@ -17,23 +17,29 @@ const NONE = "none"
 
 /**
  * Zone, region and district pickers from the organization's places. Submits
- * regionKey and districtKey; the zone isn't stored, it only narrows the
- * region list. Place them in a three-column grid.
+ * zoneKey, regionKey and districtKey; what's kept of them is up to the form's
+ * action. Place them in a three-column grid.
  */
 export function PlaceFields({
   places,
+  zoneKey: initialZoneKey,
   regionKey: initialRegionKey,
   districtKey: initialDistrictKey,
   idPrefix,
 }: {
   places: PlaceZone[]
+  /** Only needed when nothing finer than the zone was picked. */
+  zoneKey?: string | null
   regionKey: string | null
   districtKey: string | null
   /** Keeps the field ids apart from the rest of the form's, e.g. "dealer". */
   idPrefix: string
 }) {
   const [zoneKey, setZoneKey] = useState(
-    () => places.find((zone) => zone.regions.some((region) => region.key === initialRegionKey))?.key ?? ""
+    () =>
+      places.find((zone) => zone.regions.some((region) => region.key === initialRegionKey))?.key ??
+      initialZoneKey ??
+      ""
   )
   const [regionKey, setRegionKey] = useState(initialRegionKey ?? "")
   const [districtKey, setDistrictKey] = useState(initialDistrictKey ?? "")
@@ -42,6 +48,7 @@ export function PlaceFields({
 
   return (
     <>
+      <input type="hidden" name="zoneKey" value={zoneKey} />
       <input type="hidden" name="regionKey" value={regionKey} />
       <input type="hidden" name="districtKey" value={districtKey} />
       <Field>
