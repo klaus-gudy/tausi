@@ -223,3 +223,14 @@
 ::view-transition-new(root) {
   z-index: 1;
 }
+/* A list shown as cards (components/mobile-cards.tsx) drops the frame of the
+   card that holds its table, so the cards get the whole width of a phone.
+   56rem is the @4xl/main breakpoint where the table comes back. */
+@container main (width < 56rem) {
+  [data-slot="card"]:has(> [data-slot="card-content"] > [data-slot="mobile-cards"]) {
+    --card-spacing: 0px;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+}
