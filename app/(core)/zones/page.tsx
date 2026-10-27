@@ -25,6 +25,7 @@ import {
 import { formatCount } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
+import { BY_NAME, SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 
 export const metadata: Metadata = {
   title: "Zones",
@@ -71,8 +72,8 @@ async function Zones() {
       },
       salespeople: {
         where: { deactivatedAt: null },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
+        orderBy: BY_NAME,
+        select: { id: true, ...SALESPERSON_PERSON },
       },
     },
   });
@@ -131,7 +132,7 @@ async function Zones() {
                 </TableCell>
                 <TableCell className="whitespace-normal">
                   {zone.salespeople.length ? (
-                    zone.salespeople.map((salesperson) => <div key={salesperson.id}>{salesperson.name}</div>)
+                    zone.salespeople.map((salesperson) => <div key={salesperson.id}>{salespersonName(salesperson)}</div>)
                   ) : (
                     <span className="text-muted-foreground">No one yet</span>
                   )}
