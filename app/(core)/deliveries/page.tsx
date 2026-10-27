@@ -110,7 +110,6 @@ async function Deliveries({ searchParams }: Pick<PageProps<"/deliveries">, "sear
         id: true,
         number: true,
         status: true,
-        createdAt: true,
         dispatchedAt: true,
         movements: {
           where: { type: "transferred" },
@@ -195,7 +194,6 @@ function Incoming({
     id: string;
     number: number;
     status: StockTransferStatus;
-    createdAt: Date;
     dispatchedAt: Date | null;
     movements: { id: string; quantity: number; product: { name: string; size: string | null } }[];
   }[];
@@ -220,7 +218,7 @@ function Incoming({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Created at</TableHead>
+              <TableHead>Dispatched at</TableHead>
               <TableHead>Transfer</TableHead>
               <TableHead>Products</TableHead>
               <TableHead>Status</TableHead>
@@ -235,8 +233,15 @@ function Incoming({
               return (
                 <TableRow key={transfer.id} className="align-top">
                   <TableCell className="whitespace-nowrap">
-                    <div>{formatDate(transfer.createdAt)}</div>
-                    <div className="text-xs text-muted-foreground">{formatTime(transfer.createdAt)}</div>
+                    {/* When it left the store; one still being picked hasn't yet. */}
+                    {transfer.dispatchedAt ? (
+                      <>
+                        <div>{formatDate(transfer.dispatchedAt)}</div>
+                        <div className="text-xs text-muted-foreground">{formatTime(transfer.dispatchedAt)}</div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Not yet</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="font-medium">{name}</div>
@@ -248,11 +253,6 @@ function Incoming({
                     <Badge variant={transfer.status === "initiated" ? "outline" : "secondary"}>
                       {TRANSFER_STATUS_LABELS[transfer.status]}
                     </Badge>
-                    {transfer.dispatchedAt ? (
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Dispatched {formatDate(transfer.dispatchedAt)}
-                      </div>
-                    ) : null}
                   </TableCell>
                   <TableCell className="text-right">
                     {transfer.status === "arrived" ? (
