@@ -18,6 +18,11 @@ export function pageNumber(param: string | string[] | undefined) {
   return Number.isInteger(page) && page > 1 ? page : 1
 }
 
+/** The page a list of `total` rows shows: its `?page=`, or the last page when that's past the end. */
+export function currentPage(param: string | string[] | undefined, total: number, pageSize: number) {
+  return Math.min(pageNumber(param), Math.max(1, Math.ceil(total / pageSize)))
+}
+
 /**
  * The page numbers to link to, with "gap" where some are left out: always the
  * first and last, and the ones either side of `page`. 1 … 4 5 6 … 20.
