@@ -19,7 +19,7 @@ import {
 } from "@/lib/inventory";
 import { formatCount } from "@/lib/format";
 import { getPrisma } from "@/lib/prisma";
-import { pickedSupplier } from "@/lib/suppliers";
+import { normalizeSupplierName, pickedSupplier } from "@/lib/suppliers";
 
 // Every change to stock is a new stock_movements row; nothing here edits or
 // deletes one. Anything that removes stock locks the products first and
@@ -97,6 +97,39 @@ export async function receiveStock(
     success: true,
     message: `Received ${plural(units, "unit")} of ${plural(lines.length, "product")} into ${warehouse.name}.`,
   };
+}
+
+export type Supplier = { id: string; name: string };
+
+/**
+ * Adds a supplier to receive stock from, typed in when receiving. A name the
+ * organization already has, in any case, gives back that supplier.
+ */
+export async function addSupplier(
+  name: string
+): Promise<ActionResult & { supplier?: Supplier }> {
+  const member = await memberWith("stock.receive");
+  if (!member) return notAllowed;
+  const supplierName = normalizeSupplierName(name);
+  if (!supplierName) return { message: "Enter the supplier's name." };
+
+  const organizationId = member.organization.id;
+  const prisma = getPrisma();
+  try {
+    const supplier = await prisma.supplier.create({
+      data: { organizationId, name: supplierName },
+      select: { id: true, name: true },
+    });
+    revalidatePath("/goods-received");
+    return { success: true, message: `${supplier.name} added to suppliers.`, supplier };
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    const supplier = await prisma.supplier.findFirstOrThrow({
+      where: { organizationId, name: supplierName },
+      select: { id: true, name: true },
+    });
+    return { success: true, message: `${supplier.name} is already a supplier.`, supplier };
+  }
 }
 
 /**
