@@ -37,7 +37,7 @@ function supplyRows(organizationId: string) {
 /** Stock in the store: what it's worth, and each product's units and cover. */
 export async function readStoreStock(organizationId: string) {
   const products = await getPrisma().$queryRaw<
-    { id: string; name: string; size: string | null; price: number; on_hand: bigint; out_30: bigint }[]
+    { id: string; name: string; size: string | null; price: number; on_hand: bigint; out_30: bigint; stocked: boolean }[]
   >`
     WITH outflow AS (
       -- Units that left the store in the window: issues and transfers, less
@@ -53,7 +53,8 @@ export async function readStoreStock(organizationId: string) {
     )
     SELECT p.id, p.name, p.size, p.selling_price AS price,
            COALESCE((SELECT SUM(quantity) FROM stock_movements WHERE product_id = p.id AND holder = 'warehouse'), 0) AS on_hand,
-           COALESCE(o.units, 0) AS out_30
+           COALESCE(o.units, 0) AS out_30,
+           EXISTS (SELECT 1 FROM stock_movements WHERE product_id = p.id AND holder = 'warehouse') AS stocked
     FROM products p
     LEFT JOIN outflow o ON o.product_id = p.id
     WHERE p.organization_id = ${organizationId}::uuid AND p.archived_at IS NULL`
@@ -67,6 +68,7 @@ export async function readStoreStock(organizationId: string) {
       size: row.size,
       onHand,
       value: Math.max(onHand, 0) * row.price,
+      stocked: row.stocked,
       perDay,
       // Days the stock lasts at the last 30 days' pace; null when nothing moved.
       daysLeft: perDay > 0 ? Math.max(onHand, 0) / perDay : null,
@@ -75,7 +77,8 @@ export async function readStoreStock(organizationId: string) {
   return {
     value: rows.reduce((sum, row) => sum + row.value, 0),
     units: rows.reduce((sum, row) => sum + Math.max(row.onHand, 0), 0),
-    outOfStock: rows.filter((row) => row.onHand <= 0).length,
+    // Only products the store has held: a new one never received isn't out.
+    outOfStock: rows.filter((row) => row.stocked && row.onHand <= 0).length,
     products: rows,
   }
 }
