@@ -15,6 +15,7 @@ import { dealerName, formatPhone } from "@/lib/dealers";
 import { formatDate } from "@/lib/format";
 import { isUuid } from "@/lib/inventory";
 import { readActiveMember } from "@/lib/membership";
+import { PLACE } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -65,15 +66,14 @@ async function Dealer({ params }: Pick<PageProps<"/super-dealers/[id]">, "params
           signedAt: true,
           deactivatedAt: true,
           createdAt: true,
-          region: { select: { name: true, zone: { select: { name: true } } } },
-          district: { select: { name: true } },
+          ...PLACE,
           onboardedBy: { select: { name: true, email: true } },
         },
       })
     : null;
   if (!dealer) return <NotFoundState />;
 
-  const place = [dealer.district?.name, dealer.region?.name].filter(Boolean).join(", ");
+  const place = [dealer.district?.name, dealer.district?.region.name].filter(Boolean).join(", ");
   const map =
     dealer.latitude !== null && dealer.longitude !== null
       ? `https://www.openstreetmap.org/?mlat=${dealer.latitude}&mlon=${dealer.longitude}#map=18/${dealer.latitude}/${dealer.longitude}`
@@ -117,7 +117,7 @@ async function Dealer({ params }: Pick<PageProps<"/super-dealers/[id]">, "params
             <Details
               rows={[
                 ["District, region", place || null],
-                ["Zone", dealer.region?.zone.name ?? null],
+                ["Zone", dealer.district?.region.zone.name ?? null],
                 ["Address", dealer.address],
               ]}
             />
