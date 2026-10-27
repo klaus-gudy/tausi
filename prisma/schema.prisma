@@ -151,6 +151,7 @@ model Organization {
   warehouses     Warehouse[]
   salespeople    Salesperson[]
   stockMovements StockMovement[]
+  suppliers      Supplier[]
   stockReceipts  StockReceipt[]
   stockTransfers StockTransfer[]
   deliveries     Delivery[]
@@ -486,7 +487,7 @@ model StockReceipt {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   warehouseId    String   @map("warehouse_id") @db.Uuid
-  supplierName   String?  @map("supplier_name")
+  supplierId     String   @map("supplier_id") @db.Uuid
   // Delivery note or invoice number.
   reference      String?
   note           String?
@@ -498,12 +499,31 @@ model StockReceipt {
 
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   warehouse      Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: NoAction)
+  supplier       Supplier        @relation(fields: [supplierId], references: [id], onDelete: NoAction)
   receivedBy     User?           @relation(fields: [receivedById], references: [id], onDelete: Restrict)
   stockMovements StockMovement[]
 
   @@index([organizationId, receivedOn])
   @@index([warehouseId])
+  @@index([supplierId])
   @@map("stock_receipts")
+}
+
+// Who stock is received from. Every organization has "Manufactured" (see
+// lib/suppliers.ts); a receipt recorded without a supplier is filed under it.
+model Supplier {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  // Unique in the organization, ignoring case: "Acme" and "acme" clash.
+  name           String   @db.Citext
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stockReceipts StockReceipt[]
+
+  @@unique([organizationId, name])
+  @@map("suppliers")
 }
 
 // The field staff stock is sent to. Linked to a member's login, they
