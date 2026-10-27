@@ -258,10 +258,12 @@ function Incoming({
                     ) : null}
                   </TableCell>
                   <TableCell className="text-right">
-                    {transfer.status === "initiated" ? (
-                      <span className="text-xs text-muted-foreground">Still at the store</span>
-                    ) : (
+                    {transfer.status === "arrived" ? (
                       <AcknowledgeButton id={transfer.id} name={name} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {transfer.status === "initiated" ? "Still at the store" : "On its way"}
+                      </span>
                     )}
                   </TableCell>
                 </TableRow>
