@@ -5,8 +5,8 @@ import { Truck, UserX } from "lucide-react";
 
 import { AcknowledgeButton } from "./acknowledge-button";
 import { RecordDeliveryDialog } from "./delivery-dialog";
-import { LoadMore } from "@/components/load-more";
 import { NoAccessState } from "@/components/no-access-state";
+import { TablePagination } from "@/components/table-pagination";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -35,7 +35,7 @@ import {
 import { byDealerName, dealerName } from "@/lib/dealers";
 import { deliveryNumber, heldStock, readOwnSalesperson } from "@/lib/deliveries";
 import { formatCount, formatDate, formatDay, formatTime } from "@/lib/format";
-import { shownCount } from "@/lib/list-size";
+import { currentPage } from "@/lib/list-size";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   title: "Deliveries",
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 export default function DeliveriesPage({ searchParams }: PageProps<"/deliveries">) {
   return (
@@ -71,7 +71,7 @@ async function Deliveries({ searchParams }: Pick<PageProps<"/deliveries">, "sear
   if (!canRecord && !canReadAll) return <NoAccessState reason="no-permission" />;
 
   const own = canRecord ? await readOwnSalesperson(member) : null;
-  const shown = shownCount((await searchParams).show, PAGE_SIZE);
+  const { page } = await searchParams;
 
   if (!own && !canReadAll) {
     return (
@@ -92,7 +92,7 @@ async function Deliveries({ searchParams }: Pick<PageProps<"/deliveries">, "sear
   return (
     <>
       {own ? <OwnStock member={member} salesperson={own} /> : null}
-      <DeliveryList member={member} salespersonId={canReadAll ? null : own!.id} shown={shown} />
+      <DeliveryList member={member} salespersonId={canReadAll ? null : own!.id} pageParam={page} />
     </>
   );
 }
@@ -282,38 +282,39 @@ async function OwnStock({
 async function DeliveryList({
   member,
   salespersonId,
-  shown,
+  pageParam,
 }: {
   member: ActiveMember;
   salespersonId: string | null;
-  shown: number;
+  /** The raw `?page=`. */
+  pageParam: string | string[] | undefined;
 }) {
   const where = {
     organizationId: member.organization.id,
     ...(salespersonId ? { salespersonId } : {}),
   };
   const prisma = getPrisma();
-  const [deliveries, total] = await Promise.all([
-    prisma.delivery.findMany({
-      where,
-      orderBy: [{ deliveredOn: "desc" }, { number: "desc" }],
-      take: shown,
-      select: {
-        id: true,
-        number: true,
-        deliveredOn: true,
-        reference: true,
-        note: true,
-        salesperson: { select: { name: true } },
-        superDealer: { select: { shopName: true, contactName: true } },
-        lines: {
-          orderBy: { product: { name: "asc" } },
-          select: { id: true, quantity: true, product: { select: { name: true, size: true } } },
-        },
+  const total = await prisma.delivery.count({ where });
+  const page = currentPage(pageParam, total, PAGE_SIZE);
+  const deliveries = await prisma.delivery.findMany({
+    where,
+    orderBy: [{ deliveredOn: "desc" }, { number: "desc" }],
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+    select: {
+      id: true,
+      number: true,
+      deliveredOn: true,
+      reference: true,
+      note: true,
+      salesperson: { select: { name: true } },
+      superDealer: { select: { shopName: true, contactName: true } },
+      lines: {
+        orderBy: { product: { name: "asc" } },
+        select: { id: true, quantity: true, product: { select: { name: true, size: true } } },
       },
-    }),
-    prisma.delivery.count({ where }),
-  ]);
+    },
+  });
 
   return (
     <Card>
@@ -361,7 +362,7 @@ async function DeliveryList({
                 ))}
               </TableBody>
             </Table>
-            <LoadMore shown={shown} total={total} pageSize={PAGE_SIZE} />
+            <TablePagination page={page} total={total} pageSize={PAGE_SIZE} />
           </>
         ) : (
           <Empty>
