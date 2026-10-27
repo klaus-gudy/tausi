@@ -58,3 +58,43 @@ export async function readPlaces(organizationId: string): Promise<PlaceZone[]> {
     },
   })
 }
+
+/**
+ * Select this on a warehouse or dealer for where it is. Only the district is
+ * stored; its region and that region's zone come with it.
+ */
+export const PLACE = {
+  district: {
+    select: {
+      key: true,
+      regionKey: true,
+      name: true,
+      region: { select: { name: true, zone: { select: { name: true } } } },
+    },
+  },
+} as const
+
+/** The region and district keys the place pickers start from, for a place read with PLACE. */
+export function placeKeys(place: { district: { key: string; regionKey: string } | null }) {
+  return { regionKey: place.district?.regionKey ?? null, districtKey: place.district?.key ?? null }
+}
+
+/**
+ * The district a form's place pickers chose, from the regionKey and
+ * districtKey they submit. No region means no place; a region needs its district.
+ */
+export async function pickedDistrict(
+  organizationId: string,
+  formData: FormData
+): Promise<{ districtId: string | null } | { message: string }> {
+  const regionKey = String(formData.get("regionKey") ?? "").trim().slice(0, 100)
+  const districtKey = String(formData.get("districtKey") ?? "").trim().slice(0, 100)
+  if (!regionKey) return { districtId: null }
+  if (!districtKey) return { message: "Pick the district too." }
+  // A district is only found in its own region, so finding it checks both.
+  const district = await getPrisma().district.findUnique({
+    where: { organizationId_regionKey_key: { organizationId, regionKey, key: districtKey } },
+    select: { id: true },
+  })
+  return district ? { districtId: district.id } : { message: "Pick a district in that region." }
+}
