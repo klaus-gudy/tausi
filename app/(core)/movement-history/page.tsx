@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/table";
 import type { StockMovementType } from "@/lib/generated/prisma/client";
 import { dealerName } from "@/lib/dealers";
-import { formatCount, formatDay, formatSigned } from "@/lib/format";
+import { formatDate, formatSigned, formatTime } from "@/lib/format";
 import { shownCount } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -74,34 +74,32 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
   if (!member) return <NoAccessState reason="no-organization" />;
   if (!member.permissions.has("stock.read")) return <NoAccessState reason="no-permission" />;
 
-  const shown = shownCount((await searchParams).show, PAGE_SIZE);
   // The warehouses' side of each move; an issue's dealer side mirrors it.
   const where = { organizationId: member.organization.id, holder: "warehouse" as const };
   const prisma = getPrisma();
-  const [total, movements] = await Promise.all([
-    prisma.stockMovement.count({ where }),
-    prisma.stockMovement.findMany({
-      where,
-      orderBy: [{ occurredOn: "desc" }, { createdAt: "desc" }],
-      take: shown,
-      select: {
-        id: true,
-        type: true,
-        quantity: true,
-        unitCost: true,
-        reference: true,
-        note: true,
-        occurredOn: true,
-        product: { select: { name: true } },
-        warehouse: { select: { name: true } },
-        superDealer: { select: { shopName: true, contactName: true } },
-        receipt: { select: { supplierName: true, reference: true, note: true } },
-        transfer: { select: { number: true, salesperson: { select: { name: true } } } },
-        createdBy: { select: { name: true, email: true } },
-        reversedBy: { select: { id: true } },
-      },
-    }),
-  ]);
+  const shown = shownCount((await searchParams).show, PAGE_SIZE);
+  const total = await prisma.stockMovement.count({ where });
+  const movements = await prisma.stockMovement.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: shown,
+    select: {
+      id: true,
+      type: true,
+      quantity: true,
+      reference: true,
+      note: true,
+      createdAt: true,
+      product: { select: { name: true, size: true } },
+      warehouse: { select: { name: true } },
+      superDealer: { select: { shopName: true, contactName: true } },
+      receipt: { select: { supplierName: true, reference: true, note: true } },
+      transfer: { select: { number: true, salesperson: { select: { name: true } } } },
+      reverses: { select: { type: true } },
+      createdBy: { select: { name: true, email: true } },
+      reversedBy: { select: { id: true } },
+    },
+  });
 
   if (!total) {
     return (
@@ -126,21 +124,21 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>Movement</TableHead>
-              <TableHead className="hidden md:table-cell">From / to</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Product</TableHead>
+              <TableHead className="hidden md:table-cell">From</TableHead>
+              <TableHead className="hidden md:table-cell">To</TableHead>
               <TableHead className="text-right">Quantity</TableHead>
               <TableHead className="hidden lg:table-cell">Recorded by</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {movements.map((movement) => {
-              const counterpart =
-                (movement.superDealer && dealerName(movement.superDealer)) ??
-                (movement.transfer && `${movement.transfer.salesperson.name} · ${transferNumber(movement.transfer.number)}`) ??
-                movement.receipt?.supplierName ??
-                (movement.type === "adjustment" ? "Stock count" : "—");
+              const warehouse: Party = { name: movement.warehouse?.name ?? "—" };
+              const other = counterpart(movement);
+              // Stock coming in is from the other side to the warehouse; going out, the reverse.
+              const [from, to] = movement.quantity > 0 ? [other, warehouse] : [warehouse, other];
               const details = [
-                movement.warehouse?.name,
                 movement.reference ?? movement.receipt?.reference,
                 movement.note ?? movement.receipt?.note,
               ]
@@ -148,13 +146,19 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
                 .join(" · ");
               return (
                 <TableRow key={movement.id} className={movement.reversedBy ? "text-muted-foreground" : undefined}>
-                  <TableCell className="whitespace-nowrap">{formatDay(movement.occurredOn)}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <div>{formatDate(movement.createdAt)}</div>
+                    <div className="text-xs text-muted-foreground">{formatTime(movement.createdAt)}</div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={TYPE_BADGES[movement.type] ?? "outline"}>{TYPE_LABELS[movement.type]}</Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={TYPE_BADGES[movement.type] ?? "outline"}>
-                        {TYPE_LABELS[movement.type]}
-                      </Badge>
                       <span className="font-medium">{movement.product.name}</span>
+                      {movement.product.size ? (
+                        <span className="text-muted-foreground">{movement.product.size}</span>
+                      ) : null}
                       {movement.reversedBy ? <Badge variant="outline">Reversed</Badge> : null}
                     </div>
                     {details ? (
@@ -162,12 +166,10 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
                     ) : null}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {counterpart}
-                    {movement.unitCost !== null ? (
-                      <div className="text-xs text-muted-foreground">
-                        {formatCount(movement.unitCost)} each
-                      </div>
-                    ) : null}
+                    <PartyCell party={from} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <PartyCell party={to} />
                   </TableCell>
                   <TableCell
                     className={`text-right font-medium tabular-nums ${movement.quantity > 0 ? "text-emerald-700 dark:text-emerald-400" : ""}`}
@@ -185,5 +187,35 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
         <LoadMore shown={shown} total={total} pageSize={PAGE_SIZE} />
       </CardContent>
     </Card>
+  );
+}
+
+/** One side of a movement: a warehouse, supplier, salesperson or dealer. */
+type Party = { name: string; detail?: string };
+
+/** Who or what is on the other side of a warehouse movement. */
+function counterpart(movement: {
+  type: StockMovementType;
+  superDealer: Parameters<typeof dealerName>[0] | null;
+  transfer: { number: number; salesperson: { name: string } } | null;
+  receipt: { supplierName: string | null } | null;
+  reverses: { type: StockMovementType } | null;
+}): Party {
+  if (movement.superDealer) return { name: dealerName(movement.superDealer), detail: "Super dealer" };
+  if (movement.transfer) {
+    return { name: movement.transfer.salesperson.name, detail: transferNumber(movement.transfer.number) };
+  }
+  if (movement.receipt) return { name: movement.receipt.supplierName ?? "Unnamed supplier", detail: "Supplier" };
+  // A count's difference, or undoing one, has no one on the other side.
+  const type = movement.type === "reversal" ? movement.reverses?.type : movement.type;
+  return { name: type === "adjustment" ? "Stock count" : "—" };
+}
+
+function PartyCell({ party }: { party: Party }) {
+  return (
+    <>
+      <div>{party.name}</div>
+      {party.detail ? <div className="text-xs text-muted-foreground">{party.detail}</div> : null}
+    </>
   );
 }
