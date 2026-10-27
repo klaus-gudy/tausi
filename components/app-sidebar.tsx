@@ -70,7 +70,7 @@ const navGroups: {
     label: "Catalogue",
     items: [
       { title: "Products", href: "/products", icon: Package, permission: "products.read" },
-      { title: "Zones", href: "/zones", icon: MapPinned, permission: "dealers.read" },
+      { title: "Zones", href: "/zones", icon: MapPinned, permission: "zones.read" },
       { title: "Warehouses", href: "/warehouses", icon: Warehouse, permission: "warehouses.read" },
     ],
   },
