@@ -8,8 +8,8 @@ import { setSalespersonActive } from "./actions";
 import {
   EditSalespersonDialog,
   type EditableSalesperson,
-  type ZoneOption,
 } from "./salesperson-dialog";
+import type { PlaceZone } from "@/lib/dealers";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,11 +20,11 @@ import {
 
 export function SalespersonMenu({
   salesperson,
-  zones,
+  places,
   inactive,
 }: {
   salesperson: EditableSalesperson;
-  zones: ZoneOption[];
+  places: PlaceZone[];
   inactive: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -61,7 +61,7 @@ export function SalespersonMenu({
       </DropdownMenu>
       <EditSalespersonDialog
         salesperson={salesperson}
-        zones={zones}
+        places={places}
        
         open={editing}
         onOpenChange={setEditing}
