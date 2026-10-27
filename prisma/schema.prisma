@@ -514,8 +514,12 @@ model Salesperson {
   // The member they are: their name and email are the user's, their phone
   // the membership's. Invited members are salespeople before they join.
   membershipId   String    @unique @map("membership_id") @db.Uuid
-  // The zone they cover.
+  // What they cover, stored as the smallest place picked: a district, else a
+  // region, else a zone. At most one is set (a check constraint says so); the
+  // larger places follow from it.
   zoneKey        String?   @map("zone_key")
+  regionKey      String?   @map("region_key")
+  districtId     String?   @map("district_id") @db.Uuid
   notes          String?
   // Inactive salespeople keep their history but can't be sent stock.
   deactivatedAt  DateTime? @map("deactivated_at") @db.Timestamptz
@@ -525,12 +529,16 @@ model Salesperson {
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // Places are the organization's own, so the key pairs with organizationId.
   zone         Zone?           @relation(fields: [organizationId, zoneKey], references: [organizationId, key], onDelete: NoAction)
+  region       Region?         @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
+  district     District?       @relation(fields: [districtId], references: [id], onDelete: NoAction)
   // Restrict: a member who is a salesperson with history can't be removed.
   membership   Membership      @relation(fields: [membershipId], references: [id], onDelete: Restrict)
   transfers    StockTransfer[]
   deliveries   Delivery[]
 
   @@index([organizationId, zoneKey])
+  @@index([organizationId, regionKey])
+  @@index([districtId])
   @@map("salespeople")
 }
 
@@ -622,9 +630,10 @@ model Region {
   zoneKey        String @map("zone_key")
   name           String
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  zone         Zone         @relation(fields: [organizationId, zoneKey], references: [organizationId, key], onDelete: NoAction)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  zone         Zone          @relation(fields: [organizationId, zoneKey], references: [organizationId, key], onDelete: NoAction)
   districts    District[]
+  salespeople  Salesperson[]
 
   @@id([organizationId, key])
   @@index([organizationId, zoneKey])
@@ -644,6 +653,7 @@ model District {
   region       Region        @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
   superDealers SuperDealer[]
   warehouses   Warehouse[]
+  salespeople  Salesperson[]
 
   @@unique([organizationId, regionKey, key])
   @@map("districts")
