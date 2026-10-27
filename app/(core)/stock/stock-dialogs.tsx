@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import { adjustStock, receiveStock } from "./actions";
 import { DatePicker } from "@/components/date-picker";
-import { MoneyInput } from "@/components/money-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,7 +27,6 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupText } from "@/components/ui/input-group";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   Select,
@@ -110,71 +108,55 @@ export function useDialogAction(action: Action, onDone: () => void) {
   }, initialState);
 }
 
-/** Product rows for a receive, transfer or delivery form; submits parallel productId/quantity fields. */
+/**
+ * Product rows for a receive, transfer or delivery form; submits parallel
+ * productId/quantity fields. A product picked on one line isn't offered on
+ * the others.
+ */
 export function ProductLines({
   products,
-  withCost,
   showOnHand,
   onHandLabel = "on hand",
 }: {
   products: StockProduct[];
-  withCost: boolean;
   showOnHand: boolean;
   /** What the count next to each product is, e.g. "with you". */
   onHandLabel?: string;
 }) {
   const nextKey = useRef(1);
-  const [lines, setLines] = useState([0]);
-  // What's typed on each line, by key, for the receipt total.
-  const [typed, setTyped] = useState<Record<number, { quantity: string; unitCost: string }>>({});
-  const type = (key: number, field: "quantity" | "unitCost", value: string) =>
-    setTyped((current) => ({
-      ...current,
-      [key]: { ...(current[key] ?? { quantity: "", unitCost: "" }), [field]: value },
-    }));
-  let units = 0;
-  let value = 0;
-  let uncosted = 0;
-  for (const key of lines) {
-    const quantity = Number(typed[key]?.quantity) || 0;
-    const unitCost = typed[key]?.unitCost;
-    units += quantity;
-    if (unitCost) value += quantity * Number(unitCost);
-    else if (quantity) uncosted += 1;
-  }
-  const uncostedLines = uncosted === 1 ? "1 line has" : `${uncosted} lines have`;
+  const [lines, setLines] = useState([{ key: 0, productId: "" }]);
+  const picked = new Set(lines.map((line) => line.productId).filter(Boolean));
+  // Another line only once every line has its product and some are left to pick.
+  const canAdd = picked.size === lines.length && picked.size < products.length;
+  const pick = (key: number, productId: string) =>
+    setLines((current) => current.map((line) => (line.key === key ? { ...line, productId } : line)));
 
   return (
     <FieldSet>
       <FieldLegend variant="label">Products</FieldLegend>
       <div className="grid gap-2">
-        {lines.map((key, index) => (
-          <div
-            key={key}
-            className={
-              withCost
-                ? "grid grid-cols-[1fr_5.5rem_auto] gap-2 sm:grid-cols-[1fr_6rem_8rem_auto]"
-                : "grid grid-cols-[1fr_6rem_auto] gap-2"
-            }
-          >
-            <NativeSelect
-              name="productId"
-              aria-label={`Product, line ${index + 1}`}
-              defaultValue=""
-              className="w-full"
-              required={index === 0}
-            >
-              <NativeSelectOption value="" disabled>
-                Pick a product
-              </NativeSelectOption>
-              {products.map((product) => (
-                <NativeSelectOption key={product.id} value={product.id}>
-                  {product.name}
-                  {product.size ? ` · ${product.size}` : ""} ({product.code})
-                  {showOnHand ? ` · ${formatCount(product.onHand)} ${onHandLabel}` : ""}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+        {lines.map((line, index) => (
+          <div key={line.key} className="grid grid-cols-[minmax(0,1fr)_6rem_auto] gap-2">
+            <input type="hidden" name="productId" value={line.productId} />
+            <Select value={line.productId} onValueChange={(productId) => pick(line.key, productId)}>
+              <SelectTrigger aria-label={`Product, line ${index + 1}`} className="w-full">
+                <SelectValue placeholder="Pick a product" />
+              </SelectTrigger>
+              <SelectContent>
+                {products
+                  .filter((product) => product.id === line.productId || !picked.has(product.id))
+                  .map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.name}
+                      {product.size ? ` · ${product.size}` : ""}
+                      <span className="text-muted-foreground">
+                        {product.code}
+                        {showOnHand ? ` · ${formatCount(product.onHand)} ${onHandLabel}` : ""}
+                      </span>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
             <Input
               name="quantity"
               type="number"
@@ -184,28 +166,14 @@ export function ProductLines({
               placeholder="Qty"
               aria-label={`Quantity, line ${index + 1}`}
               required={index === 0}
-              onChange={withCost ? (event) => type(key, "quantity", event.target.value) : undefined}
             />
-            {withCost ? (
-              <InputGroup className="col-span-2 sm:col-span-1 sm:col-start-3 row-start-2 sm:row-start-1">
-                <InputGroupAddon>
-                  <InputGroupText>TZS</InputGroupText>
-                </InputGroupAddon>
-                <MoneyInput
-                  name="unitCost"
-                  placeholder="Unit cost"
-                  aria-label={`Unit cost, line ${index + 1}`}
-                  onValueChange={(digits) => type(key, "unitCost", digits)}
-                />
-              </InputGroup>
-            ) : null}
             <Button
               type="button"
               variant="ghost"
               size="icon"
               aria-label={`Remove line ${index + 1}`}
               disabled={lines.length === 1}
-              onClick={() => setLines((current) => current.filter((other) => other !== key))}
+              onClick={() => setLines((current) => current.filter((other) => other.key !== line.key))}
             >
               <Trash2 />
             </Button>
@@ -217,19 +185,13 @@ export function ProductLines({
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => setLines((current) => [...current, nextKey.current++])}
+          disabled={!canAdd}
+          onClick={() => setLines((current) => [...current, { key: nextKey.current++, productId: "" }])}
         >
           <Plus data-icon="inline-start" />
           Add another product
         </Button>
       </div>
-      {withCost && units ? (
-        <FieldDescription className="tabular-nums">
-          {formatCount(units)} {units === 1 ? "unit" : "units"}
-          {value ? ` worth ${formatCount(value)}` : ""}
-          {value && uncosted ? ` (${uncostedLines} no unit cost)` : ""}
-        </FieldDescription>
-      ) : null}
     </FieldSet>
   );
 }
@@ -336,7 +298,7 @@ function ReceiveForm({
             <DatePicker id="receive-day" name="occurredOn" defaultValue={day} maxDate={day} />
           </Field>
         </div>
-        <ProductLines products={products} withCost={false} showOnHand={false} />
+        <ProductLines products={products} showOnHand={false} />
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
