@@ -49,7 +49,6 @@ model User {
   transfersArrived      StockTransfer[]     @relation("TransferArrivedBy")
   transfersCancelled    StockTransfer[]     @relation("TransferCancelledBy")
   transfersAcknowledged StockTransfer[]     @relation("TransferAcknowledgedBy")
-  salespeople           Salesperson[]
   deliveriesRecorded    Delivery[]
   dealersOnboarded      SuperDealer[]
   productsCreated       Product[]           @relation("ProductCreatedBy")
@@ -191,7 +190,6 @@ model Role {
   organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   permissions  RolePermission[]
   memberships  Membership[]
-  invitations  Invitation[]
 
   @@unique([organizationId, key])
   // NULLs are distinct in the unique above, so system role keys need their own.
@@ -211,6 +209,9 @@ model RolePermission {
 }
 
 enum MembershipStatus {
+  // Added with an invitation that hasn't been accepted yet: they can't sign in
+  // to the organization, but already show on Members (and Salespeople).
+  invited
   active
   suspended
 
@@ -223,16 +224,16 @@ model Membership {
   userId         String           @map("user_id") @db.Uuid
   roleId         String           @map("role_id") @db.Uuid
   status         MembershipStatus @default(active)
-  // How the organization knows them, set when inviting or editing a member.
-  // The name falls back to the user's own.
-  name           String?
+  // Their name and email are the user's; the phone is how this organization reaches them.
   phone          String?
   invitedById    String?          @map("invited_by_id") @db.Uuid
+  // When they were added; set again when an invited member accepts.
   joinedAt       DateTime         @default(now()) @map("joined_at") @db.Timestamptz
   updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation("MembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+  salesperson  Salesperson?
   // NoAction, not Restrict: checked at the end of the statement, so deleting an
   // organization can cascade through its custom roles and memberships together.
   role         Role         @relation(fields: [roleId], references: [id], onDelete: NoAction)
@@ -256,11 +257,10 @@ enum InvitationStatus {
 model Invitation {
   id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String           @map("organization_id") @db.Uuid
+  // Whose link it is. Their user and invited membership exist from the start,
+  // holding the name, phone and role; accepting it sets a password and makes
+  // the membership active.
   email          String           @db.Citext
-  // Copied to the membership when the invitation is accepted.
-  name           String?
-  phone          String?
-  roleId         String           @map("role_id") @db.Uuid
   // SHA-256 of the token in the invite link; the token itself is never stored.
   tokenHash      String           @unique @map("token_hash")
   status         InvitationStatus @default(pending)
@@ -272,16 +272,12 @@ model Invitation {
   updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  role         Role         @relation(fields: [roleId], references: [id], onDelete: NoAction)
   invitedBy    User?        @relation("InvitationInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
   acceptedBy   User?        @relation("InvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
-  // The salesperson waiting on this invitation, if it was sent from Salespeople.
-  salesperson  Salesperson?
 
   // At most one open invitation per address per organization.
   @@unique([organizationId, email], map: "invitations_pending_email_key", where: raw("status = 'pending'"))
   @@index([email])
-  @@index([roleId])
   @@map("invitations")
 }
 
@@ -521,17 +517,11 @@ model StockReceipt {
 model Salesperson {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
-  // Unique among the organization's salespeople, ignoring case.
-  name           String    @db.Citext
-  // Stored as +255754123456; see lib/dealers.ts.
-  phone          String?
-  email          String?   @db.Citext
+  // The member they are: their name and email are the user's, their phone
+  // the membership's. Invited members are salespeople before they join.
+  membershipId   String    @unique @map("membership_id") @db.Uuid
   // The zone they cover.
   zoneKey        String?   @map("zone_key")
-  // The member who signs in as this salesperson.
-  userId         String?   @map("user_id") @db.Uuid
-  // The invitation they were added with; accepting it fills in userId.
-  invitationId   String?   @unique @map("invitation_id") @db.Uuid
   notes          String?
   // Inactive salespeople keep their history but can't be sent stock.
   deactivatedAt  DateTime? @map("deactivated_at") @db.Timestamptz
@@ -541,13 +531,11 @@ model Salesperson {
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // Places are the organization's own, so the key pairs with organizationId.
   zone         Zone?           @relation(fields: [organizationId, zoneKey], references: [organizationId, key], onDelete: NoAction)
-  user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
-  invitation   Invitation?     @relation(fields: [invitationId], references: [id], onDelete: SetNull)
+  // Restrict: a member who is a salesperson with history can't be removed.
+  membership   Membership      @relation(fields: [membershipId], references: [id], onDelete: Restrict)
   transfers    StockTransfer[]
   deliveries   Delivery[]
 
-  @@unique([organizationId, name])
-  @@unique([organizationId, userId])
   @@index([organizationId, zoneKey])
   @@map("salespeople")
 }
