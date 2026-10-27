@@ -42,7 +42,8 @@ export async function saveSalesperson(
   const name = readText(formData.get("name"));
   const typedPhone = readText(formData.get("phone"), 40);
   const phone = typedPhone ? normalizePhone(typedPhone) : null;
-  const notes = readText(formData.get("notes"), 1000);
+  // The form no longer asks for notes; ones already saved are left as they are.
+  const notes = formData.has("notes") ? readText(formData.get("notes"), 1000) : undefined;
   if (!name) return { message: "Enter the salesperson's name." };
   if (typedPhone && !phone) return { message: "Enter a phone number like 0754 123 456, or leave it empty." };
 
@@ -66,7 +67,8 @@ type Person = {
   phone: string | null;
   /** The one place they cover: a zone, a region or a district. */
   covers: { zoneKey: string | null; regionKey: string | null; districtId: string | null };
-  notes: string | null;
+  /** Left out when the form has no notes field, so saved notes stay. */
+  notes?: string | null;
 };
 
 async function addSalesperson(
