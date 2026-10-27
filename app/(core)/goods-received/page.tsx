@@ -6,6 +6,13 @@ import { PackagePlus } from "lucide-react";
 
 import { ReceiveStockDialog } from "../stock/stock-dialogs";
 import { receiptLines } from "./receipts";
+import {
+  MobileCard,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { TablePagination } from "@/components/table-pagination";
 import { Card, CardContent } from "@/components/ui/card";
@@ -121,7 +128,40 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
       {total ? (
         <Card>
           <CardContent>
-            <Table>
+            <MobileCards>
+              {receipts.map((receipt) => {
+                const { lines, units } = receiptLines(receipt.stockMovements);
+                return (
+                  <MobileCard key={receipt.id} className="relative">
+                    <MobileCardHeader
+                      title={
+                        <Link href={`/goods-received/${receipt.id}`} className="after:absolute after:inset-0">
+                          {receipt.supplier.name}
+                        </Link>
+                      }
+                      description={formatDay(receipt.receivedOn)}
+                      aside={<span className="font-medium tabular-nums">{formatCount(units)} units</span>}
+                    />
+                    <MobileCardFields>
+                      <MobileCardField label="Warehouse">{receipt.warehouse.name}</MobileCardField>
+                      <MobileCardField label="Recorded by">
+                        {receipt.receivedBy?.name || receipt.receivedBy?.email || "—"}
+                      </MobileCardField>
+                    </MobileCardFields>
+                    <ul className="grid gap-0.5 text-muted-foreground">
+                      {lines.map((line) => (
+                        <li key={line.id} className="truncate">
+                          {formatCount(line.quantity)} × {line.product.name}
+                          {line.product.size ? ` ${line.product.size}` : null}
+                          {line.reversed ? " (reversed)" : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </MobileCard>
+                );
+              })}
+            </MobileCards>
+            <Table className="hidden @4xl/main:table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Received</TableHead>
