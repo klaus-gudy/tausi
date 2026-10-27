@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { History } from "lucide-react";
 
 import { NoAccessState } from "@/components/no-access-state";
+import { ProductName } from "@/components/product-name";
 import { TablePagination } from "@/components/table-pagination";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -155,8 +156,8 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
                     <Badge variant={TYPE_BADGES[movement.type] ?? "outline"}>{TYPE_LABELS[movement.type]}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{movement.product.name}</span>
+                    <div className="flex items-center gap-2">
+                      <ProductName name={movement.product.name} className="font-medium" />
                       {movement.product.size ? (
                         <span className="text-muted-foreground">{movement.product.size}</span>
                       ) : null}
