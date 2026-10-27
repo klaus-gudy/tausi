@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import Link from "next/link";
-import { PenLine, Store } from "lucide-react";
+import { Store } from "lucide-react";
 
 import { AddDealerDialog } from "./dealer-dialog";
 import { DealerMenu } from "./dealer-menu";
 import { NoAccessState } from "@/components/no-access-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { UrlTabs } from "@/components/url-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -65,7 +64,6 @@ async function SuperDealers({
 
   const tab = (await searchParams).tab === "inactive" ? "inactive" : "active";
   const canManage = member.permissions.has("dealers.manage");
-  const canOnboard = member.permissions.has("dealers.onboard");
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
@@ -128,16 +126,8 @@ async function SuperDealers({
         { value: "inactive", label: "Inactive", count: inactiveCount },
       ]}
       actions={
-        canManage || canOnboard
-          ? {
-              active: (
-                <div className="flex flex-wrap gap-2">
-                  {canOnboard ? <OnboardLink variant={canManage ? "outline" : "default"} /> : null}
-                  {canManage ? <AddDealerDialog places={places} /> : null}
-                </div>
-              ),
-            }
-          : undefined
+        // Field onboarding (/super-dealers/onboard) is left out of the page for now.
+        canManage ? { active: <AddDealerDialog places={places} /> } : undefined
       }
     >
       <TabsContent value={tab}>
@@ -230,27 +220,14 @@ async function SuperDealers({
                   : "Add the shops and distributors you issue stock to."}
               </EmptyDescription>
             </EmptyHeader>
-            {tab === "active" && (canManage || canOnboard) ? (
+            {tab === "active" && canManage ? (
               <EmptyContent className="flex-row justify-center">
-                {canOnboard ? <OnboardLink variant={canManage ? "outline" : "default"} /> : null}
-                {canManage ? <AddDealerDialog places={places} /> : null}
+                <AddDealerDialog places={places} />
               </EmptyContent>
             ) : null}
           </Empty>
         )}
       </TabsContent>
     </UrlTabs>
-  );
-}
-
-/** Opens the field onboarding form, where the dealer signs. */
-function OnboardLink({ variant }: { variant: "default" | "outline" }) {
-  return (
-    <Button asChild variant={variant}>
-      <Link href="/super-dealers/onboard">
-        <PenLine data-icon="inline-start" />
-        Onboard dealer
-      </Link>
-    </Button>
   );
 }
