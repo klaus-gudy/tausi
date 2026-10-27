@@ -34,7 +34,7 @@ import { dealerScope } from "@/lib/dealer-access";
 import { byDealerName, dealerName } from "@/lib/dealers";
 import { deliveryNumber, heldStock, readOwnSalesperson } from "@/lib/deliveries";
 import { formatCount, formatDate, formatDay, formatTime } from "@/lib/format";
-import { currentPage } from "@/lib/list-size";
+import { currentPage, pageSize } from "@/lib/list-size";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
 import { PLACE } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
@@ -44,8 +44,6 @@ import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
 export const metadata: Metadata = {
   title: "Deliveries",
 };
-
-const PAGE_SIZE = 25;
 
 export default function DeliveriesPage({ searchParams }: PageProps<"/deliveries">) {
   return (
@@ -92,7 +90,9 @@ async function Deliveries({ searchParams }: Pick<PageProps<"/deliveries">, "sear
     );
   }
   // Only a salesperson has stock coming to them and in hand; others just see what was distributed.
-  if (!own) return <DeliveryList member={member} salespersonId={null} pageParam={params.page} />;
+  if (!own) {
+    return <DeliveryList member={member} salespersonId={null} pageParam={params.page} sizeParam={params.size} />;
+  }
 
   const tab: Tab = params.tab === "stock" || params.tab === "distributed" ? params.tab : "incoming";
   const organizationId = member.organization.id;
@@ -180,6 +180,7 @@ async function Deliveries({ searchParams }: Pick<PageProps<"/deliveries">, "sear
             member={member}
             salespersonId={salespersonId}
             pageParam={params.page}
+            sizeParam={params.size}
             params={{ tab: "distributed" }}
           />
         ) : null}
@@ -329,12 +330,15 @@ async function DeliveryList({
   member,
   salespersonId,
   pageParam,
+  sizeParam,
   params,
 }: {
   member: ActiveMember;
   salespersonId: string | null;
   /** The raw `?page=`. */
   pageParam: string | string[] | undefined;
+  /** The raw `?size=`. */
+  sizeParam: string | string[] | undefined;
   /** Other query params the page links keep. */
   params?: Record<string, string>;
 }) {
@@ -344,12 +348,13 @@ async function DeliveryList({
   };
   const prisma = getPrisma();
   const total = await prisma.delivery.count({ where });
-  const page = currentPage(pageParam, total, PAGE_SIZE);
+  const size = pageSize(sizeParam);
+  const page = currentPage(pageParam, total, size);
   const deliveries = await prisma.delivery.findMany({
     where,
     orderBy: [{ deliveredOn: "desc" }, { number: "desc" }],
-    skip: (page - 1) * PAGE_SIZE,
-    take: PAGE_SIZE,
+    skip: (page - 1) * size,
+    take: size,
     select: {
       id: true,
       number: true,
@@ -412,7 +417,7 @@ async function DeliveryList({
             ))}
           </TableBody>
         </Table>
-        <TablePagination page={page} total={total} pageSize={PAGE_SIZE} params={params} />
+        <TablePagination page={page} total={total} pageSize={size} params={params} />
       </CardContent>
     </Card>
   );
