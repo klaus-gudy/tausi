@@ -51,7 +51,7 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
     ? await getPrisma().stockReceipt.findFirst({
         where: { id, organizationId: member.organization.id },
         select: {
-          supplierName: true,
+          supplier: { select: { name: true } },
           note: true,
           receivedOn: true,
           createdAt: true,
@@ -83,7 +83,7 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
   return (
     <>
       <DetailHeader
-        title={receipt.supplierName ? `Receipt from ${receipt.supplierName}` : "Receipt"}
+        title={`Receipt from ${receipt.supplier.name}`}
         description={
           <>
             {formatCount(units)} {units === 1 ? "unit" : "units"} of {lines.length}{" "}
