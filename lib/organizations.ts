@@ -58,13 +58,12 @@ const STARTER_ROLES = [
 ]
 
 /**
- * Creates an organization with the user as its owner and the starter roles,
- * and with Tanzania's zones, regions and districts when withPlaces is set.
- * Run inside a transaction.
+ * Creates an organization with the user as its owner, the starter roles and
+ * Tanzania's zones, regions and districts. Run inside a transaction.
  */
 export async function createOrganizationWithOwner(
   tx: Prisma.TransactionClient,
-  { name, userId, withPlaces }: { name: string; userId: string; withPlaces: boolean }
+  { name, userId }: { name: string; userId: string }
 ) {
   const owner = await tx.role.findFirstOrThrow({
     where: { organizationId: null, key: "owner" },
@@ -90,6 +89,7 @@ export async function createOrganizationWithOwner(
       },
     })
   }
-  if (withPlaces) await seedPlaces(tx, organization.id)
+  // Every organization works with the same zones, so they're there from the start.
+  await seedPlaces(tx, organization.id)
   return organization
 }
