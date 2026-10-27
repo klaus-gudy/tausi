@@ -6,6 +6,14 @@ import { ArrowLeftRight } from "lucide-react";
 import { InitiateTransferDialog } from "./transfer-dialog";
 import { TransferMenu } from "./transfer-menu";
 import { TransferTimeline, type TimelineStep } from "./transfer-timeline";
+import {
+  MobileCard,
+  MobileCardActions,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { ProductName } from "@/components/product-name";
 import { TablePagination } from "@/components/table-pagination";
@@ -200,7 +208,64 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
         {transfers.length ? (
           <Card>
             <CardContent>
-              <Table>
+              <MobileCards>
+                {transfers.map((transfer) => {
+                  const name = transferNumber(transfer.number);
+                  const to = coverage(transfer.salesperson);
+                  return (
+                    <MobileCard key={transfer.id}>
+                      <MobileCardHeader
+                        title={name}
+                        badge={
+                          <Badge variant={STATUS_VARIANTS[transfer.status]}>
+                            {transfer.acknowledgedAt ? "Acknowledged" : TRANSFER_STATUS_LABELS[transfer.status]}
+                          </Badge>
+                        }
+                        description={`${formatDate(transfer.createdAt)}, ${formatTime(transfer.createdAt)}`}
+                        aside={
+                          <span className="font-medium tabular-nums">
+                            {formatCount(transfer.movements.reduce((sum, line) => sum - line.quantity, 0))} units
+                          </span>
+                        }
+                      />
+                      <MobileCardFields>
+                        <MobileCardField label="From">{transfer.warehouse.name}</MobileCardField>
+                        <MobileCardField label="To">
+                          {[salespersonName(transfer.salesperson), to.zone ? (to.place ?? to.zone.name) : null]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </MobileCardField>
+                        <MobileCardField label="Initiated by">
+                          {transfer.createdBy?.name || transfer.createdBy?.email || "—"}
+                        </MobileCardField>
+                      </MobileCardFields>
+                      <ul className="grid gap-0.5 text-muted-foreground">
+                        {transfer.movements.map((line) => (
+                          <li key={line.id} className="truncate">
+                            {formatCount(-line.quantity)} × {line.product.name}
+                            {line.product.size ? ` ${line.product.size}` : null}
+                          </li>
+                        ))}
+                      </ul>
+                      <MobileCardActions>
+                        <TransferTimeline
+                          name={name}
+                          route={`${transfer.warehouse.name} to ${salespersonName(transfer.salesperson)}`}
+                          steps={timeline(transfer)}
+                        />
+                        {canTransfer && isOpen ? (
+                          <TransferMenu
+                            id={transfer.id}
+                            name={name}
+                            status={transfer.status as "initiated" | "in_transit"}
+                          />
+                        ) : null}
+                      </MobileCardActions>
+                    </MobileCard>
+                  );
+                })}
+              </MobileCards>
+              <Table className="hidden @4xl/main:table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Created at</TableHead>
