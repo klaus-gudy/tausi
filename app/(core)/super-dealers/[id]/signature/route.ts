@@ -1,9 +1,10 @@
+import { dealerScope } from "@/lib/dealer-access";
 import { isUuid, memberWith } from "@/lib/inventory";
 import { getPrisma } from "@/lib/prisma";
 
 /**
- * A dealer's signature PNG, for members who can see dealers. Only ever from
- * the signed-in member's own organization, and kept out of shared caches.
+ * A dealer's signature PNG, for members who can see that dealer. Only ever
+ * from the signed-in member's own organization, and kept out of shared caches.
  */
 export async function GET(_: Request, ctx: RouteContext<"/super-dealers/[id]/signature">) {
   const member = await memberWith("dealers.read");
@@ -12,7 +13,7 @@ export async function GET(_: Request, ctx: RouteContext<"/super-dealers/[id]/sig
   if (!isUuid(id)) return new Response(null, { status: 404 });
 
   const dealer = await getPrisma().superDealer.findFirst({
-    where: { id, organizationId: member.organization.id },
+    where: { ...(await dealerScope(member)), id },
     select: { signature: true },
   });
   if (!dealer?.signature) return new Response(null, { status: 404 });
