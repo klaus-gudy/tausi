@@ -96,7 +96,7 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
       product: { select: { name: true, size: true } },
       warehouse: { select: { name: true } },
       superDealer: { select: { shopName: true, contactName: true } },
-      receipt: { select: { supplierName: true, reference: true, note: true } },
+      receipt: { select: { supplier: { select: { name: true } }, reference: true, note: true } },
       transfer: { select: { number: true, salesperson: { select: SALESPERSON_PERSON } } },
       reverses: { select: { type: true } },
       createdBy: { select: { name: true, email: true } },
@@ -201,14 +201,14 @@ function counterpart(movement: {
   type: StockMovementType;
   superDealer: Parameters<typeof dealerName>[0] | null;
   transfer: { number: number; salesperson: Parameters<typeof salespersonName>[0] } | null;
-  receipt: { supplierName: string | null } | null;
+  receipt: { supplier: { name: string } } | null;
   reverses: { type: StockMovementType } | null;
 }): Party {
   if (movement.superDealer) return { name: dealerName(movement.superDealer), detail: "Super dealer" };
   if (movement.transfer) {
     return { name: salespersonName(movement.transfer.salesperson), detail: transferNumber(movement.transfer.number) };
   }
-  if (movement.receipt) return { name: movement.receipt.supplierName ?? "Unnamed supplier", detail: "Supplier" };
+  if (movement.receipt) return { name: movement.receipt.supplier.name, detail: "Supplier" };
   // A count's difference, or undoing one, has no one on the other side.
   const type = movement.type === "reversal" ? movement.reverses?.type : movement.type;
   return { name: type === "adjustment" ? "Stock count" : "—" };
