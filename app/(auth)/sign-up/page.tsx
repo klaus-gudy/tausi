@@ -33,6 +33,7 @@ async function SignUp({ searchParams }: Pick<PageProps<"/sign-up">, "searchParam
         invitation={
           invitation && {
             email: invitation.email,
+            name: invitation.name,
             organizationName: invitation.organization.name,
             roleName: invitation.role.name,
           }
