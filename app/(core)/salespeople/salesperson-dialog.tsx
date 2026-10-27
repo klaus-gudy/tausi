@@ -220,18 +220,21 @@ function SalespersonForm({
               idPrefix="salesperson"
             />
           </div>
-          <Field>
-            <FieldLabel htmlFor="salesperson-notes">
-              Notes <span className="font-normal text-muted-foreground">(optional)</span>
-            </FieldLabel>
-            <Textarea
-              id="salesperson-notes"
-              name="notes"
-              defaultValue={salesperson?.notes ?? ""}
-              maxLength={1000}
-              rows={2}
-            />
-          </Field>
+          {/* Notes are only kept up when editing; adding asks just where they work. */}
+          {salesperson ? (
+            <Field>
+              <FieldLabel htmlFor="salesperson-notes">
+                Notes <span className="font-normal text-muted-foreground">(optional)</span>
+              </FieldLabel>
+              <Textarea
+                id="salesperson-notes"
+                name="notes"
+                defaultValue={salesperson.notes ?? ""}
+                maxLength={1000}
+                rows={2}
+              />
+            </Field>
+          ) : null}
         </FormSection>
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
