@@ -33,7 +33,13 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 export type TransferSalesperson = { id: string; name: string; zone: string | null };
@@ -82,6 +88,7 @@ function TransferForm({
   const [warehouseId, setWarehouseId] = useState(
     () => (warehouses.find((warehouse) => unitsIn(stock, warehouse.id) > 0) ?? warehouses[0])?.id ?? ""
   );
+  const [salespersonId, setSalespersonId] = useState("");
   const warehouse = warehouses.find((other) => other.id === warehouseId);
   const day = today();
   const inStock = productsIn(products, stock, warehouseId).filter((product) => product.onHand > 0);
@@ -106,23 +113,22 @@ function TransferForm({
         <div className="grid gap-5 sm:grid-cols-3">
           <Field>
             <FieldLabel htmlFor="transfer-salesperson">Salesperson</FieldLabel>
-            <NativeSelect
-              id="transfer-salesperson"
-              name="salespersonId"
-              defaultValue=""
-              className="w-full"
-              required
-            >
-              <NativeSelectOption value="" disabled>
-                Pick a salesperson
-              </NativeSelectOption>
-              {salespeople.map((salesperson) => (
-                <NativeSelectOption key={salesperson.id} value={salesperson.id}>
-                  {salesperson.name}
-                  {salesperson.zone ? ` · ${salesperson.zone}` : ""}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <input type="hidden" name="salespersonId" value={salespersonId} />
+            <Select value={salespersonId} onValueChange={setSalespersonId}>
+              <SelectTrigger id="transfer-salesperson" className="w-full">
+                <SelectValue placeholder="Pick a salesperson" />
+              </SelectTrigger>
+              <SelectContent>
+                {salespeople.map((salesperson) => (
+                  <SelectItem key={salesperson.id} value={salesperson.id}>
+                    {salesperson.name}
+                    {salesperson.zone ? (
+                      <span className="text-muted-foreground">{salesperson.zone}</span>
+                    ) : null}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
           <Field>
             <FieldLabel htmlFor="transfer-reference">Dispatch note / vehicle</FieldLabel>
