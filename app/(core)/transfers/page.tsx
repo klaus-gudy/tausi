@@ -5,6 +5,7 @@ import { ArrowLeftRight } from "lucide-react";
 
 import { InitiateTransferDialog } from "./transfer-dialog";
 import { TransferMenu } from "./transfer-menu";
+import { TransferTimeline, type TimelineStep } from "./transfer-timeline";
 import { LoadMore } from "@/components/load-more";
 import { NoAccessState } from "@/components/no-access-state";
 import { UrlTabs } from "@/components/url-tabs";
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
 import type { StockTransferStatus } from "@/lib/generated/prisma/client";
-import { formatCount, formatDate } from "@/lib/format";
+import { formatCount, formatDate, formatTime } from "@/lib/format";
 import { activeWarehouses, stockByWarehouse } from "@/lib/inventory";
 import { shownCount } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
@@ -201,18 +202,17 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Created at</TableHead>
-                    <TableHead className="hidden sm:table-cell">From</TableHead>
+                    <TableHead>Transfer</TableHead>
+                    <TableHead className="hidden sm:table-cell">Created at</TableHead>
+                    <TableHead className="hidden md:table-cell">From</TableHead>
                     <TableHead>To</TableHead>
                     <TableHead className="hidden md:table-cell">Products</TableHead>
                     <TableHead className="text-right">Units</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="hidden lg:table-cell">Initiated by</TableHead>
-                    {canTransfer && isOpen ? (
-                      <TableHead className="w-10">
-                        <span className="sr-only">Actions</span>
-                      </TableHead>
-                    ) : null}
+                    <TableHead className="w-10">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -222,13 +222,16 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                     return (
                       <TableRow key={transfer.id} className="align-top">
                         <TableCell className="whitespace-nowrap">
-                          <div className="font-medium">{formatDate(transfer.createdAt)}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {name}
-                            {transfer.reference ? ` · ${transfer.reference}` : ""}
-                          </div>
+                          <div className="font-medium">{name}</div>
+                          {transfer.reference ? (
+                            <div className="text-xs text-muted-foreground">{transfer.reference}</div>
+                          ) : null}
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell">{transfer.warehouse.name}</TableCell>
+                        <TableCell className="hidden whitespace-nowrap sm:table-cell">
+                          <div>{formatDate(transfer.createdAt)}</div>
+                          <div className="text-xs text-muted-foreground">{formatTime(transfer.createdAt)}</div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">{transfer.warehouse.name}</TableCell>
                         <TableCell>
                           <div>{transfer.salesperson.name}</div>
                           {transfer.salesperson.zone ? (
@@ -263,20 +266,26 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                               ? "Acknowledged"
                               : TRANSFER_STATUS_LABELS[transfer.status]}
                           </Badge>
-                          <Steps transfer={transfer} />
                         </TableCell>
                         <TableCell className="hidden text-muted-foreground lg:table-cell">
                           {transfer.createdBy?.name || transfer.createdBy?.email || "—"}
                         </TableCell>
-                        {canTransfer && isOpen ? (
-                          <TableCell>
-                            <TransferMenu
-                              id={transfer.id}
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <TransferTimeline
                               name={name}
-                              status={transfer.status as "initiated" | "in_transit"}
+                              route={`${transfer.warehouse.name} to ${transfer.salesperson.name}`}
+                              steps={timeline(transfer)}
                             />
-                          </TableCell>
-                        ) : null}
+                            {canTransfer && isOpen ? (
+                              <TransferMenu
+                                id={transfer.id}
+                                name={name}
+                                status={transfer.status as "initiated" | "in_transit"}
+                              />
+                            ) : null}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -307,38 +316,30 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
 
 type Person = { name: string | null; email: string } | null;
 
-/** Who did each step after initiating it and when, under the status badge. */
-function Steps({
-  transfer,
-}: {
-  transfer: {
-    dispatchedAt: Date | null;
-    arrivedAt: Date | null;
-    cancelledAt: Date | null;
-    acknowledgedAt: Date | null;
-    dispatchedBy: Person;
-    arrivedBy: Person;
-    cancelledBy: Person;
-    acknowledgedBy: Person;
-  };
-}) {
-  const who = (person: Person) => (person ? ` by ${person.name || person.email}` : "");
-  const steps = [
-    { label: "Dispatched", at: transfer.dispatchedAt, by: transfer.dispatchedBy },
-    { label: "Arrived", at: transfer.arrivedAt, by: transfer.arrivedBy },
-    { label: "Acknowledged", at: transfer.acknowledgedAt, by: transfer.acknowledgedBy },
-    { label: "Cancelled", at: transfer.cancelledAt, by: transfer.cancelledBy },
+/** A transfer's steps for its timeline: what happened, then what's still to come. */
+function timeline(transfer: {
+  createdAt: Date;
+  dispatchedAt: Date | null;
+  arrivedAt: Date | null;
+  cancelledAt: Date | null;
+  acknowledgedAt: Date | null;
+  createdBy: Person;
+  dispatchedBy: Person;
+  arrivedBy: Person;
+  cancelledBy: Person;
+  acknowledgedBy: Person;
+}): TimelineStep[] {
+  const step = (label: string, at: Date | null, by: Person): TimelineStep => ({
+    label,
+    done: at ? { date: formatDate(at), time: formatTime(at), by: by ? by.name || by.email : null } : null,
+  });
+  const initiated = step("Initiated", transfer.createdAt, transfer.createdBy);
+  // A cancelled transfer never left the store, so it has no later steps.
+  if (transfer.cancelledAt) return [initiated, step("Cancelled", transfer.cancelledAt, transfer.cancelledBy)];
+  return [
+    initiated,
+    step("Dispatched", transfer.dispatchedAt, transfer.dispatchedBy),
+    step("Arrived", transfer.arrivedAt, transfer.arrivedBy),
+    step("Acknowledged", transfer.acknowledgedAt, transfer.acknowledgedBy),
   ];
-  return (
-    <ul className="mt-1 text-xs text-muted-foreground">
-      {steps.map((step) =>
-        step.at ? (
-          <li key={step.label}>
-            {step.label} {formatDate(step.at)}
-            {who(step.by)}
-          </li>
-        ) : null
-      )}
-    </ul>
-  );
 }
