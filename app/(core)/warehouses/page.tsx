@@ -5,6 +5,13 @@ import { Warehouse } from "lucide-react";
 
 import { AddWarehouseDialog, type Keeper } from "./warehouse-dialog";
 import { WarehouseMenu } from "./warehouse-menu";
+import {
+  MobileCard,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { UrlTabs } from "@/components/url-tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -115,7 +122,38 @@ async function Warehouses({
         {warehouses.length ? (
           <Card>
             <CardContent>
-              <Table>
+              <MobileCards>
+                {warehouses.map((warehouse) => {
+                  const { district, ...rest } = warehouse;
+                  const region = district?.region;
+                  return (
+                    <MobileCard key={warehouse.id}>
+                      <MobileCardHeader
+                        title={warehouse.name}
+                        description={
+                          region ? [district?.name, region.name, region.zone.name].filter(Boolean).join(", ") : warehouse.address
+                        }
+                        aside={
+                          canManage ? (
+                            <WarehouseMenu
+                              warehouse={{ ...rest, ...placeKeys(warehouse) }}
+                              places={places}
+                              keepers={keepers}
+                              inactive={tab === "inactive"}
+                            />
+                          ) : undefined
+                        }
+                      />
+                      <MobileCardFields>
+                        {region && warehouse.address ? <MobileCardField label="Address">{warehouse.address}</MobileCardField> : null}
+                        <MobileCardField label="Storekeeper">{warehouse.contactName ?? "—"}</MobileCardField>
+                        {warehouse.phone ? <MobileCardField label="Phone">{formatPhone(warehouse.phone)}</MobileCardField> : null}
+                      </MobileCardFields>
+                    </MobileCard>
+                  );
+                })}
+              </MobileCards>
+              <Table className="hidden @4xl/main:table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Warehouse</TableHead>
