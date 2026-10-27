@@ -42,7 +42,8 @@ export const metadata: Metadata = {
 const PAGE_SIZE = 50;
 
 const TABS = {
-  open: ["initiated", "in_transit"],
+  initiated: ["initiated"],
+  in_transit: ["in_transit"],
   arrived: ["arrived"],
   cancelled: ["cancelled"],
 } satisfies Record<string, StockTransferStatus[]>;
@@ -50,9 +51,13 @@ const TABS = {
 type Tab = keyof typeof TABS;
 
 const EMPTY: Record<Tab, { title: string; description: string }> = {
-  open: {
-    title: "No open transfers",
-    description: "Transfers being picked or on the road show up here until they arrive.",
+  initiated: {
+    title: "No transfers waiting to leave",
+    description: "Transfers show up here once their stock is picked, until they're marked in transit.",
+  },
+  in_transit: {
+    title: "Nothing in transit",
+    description: "Transfers on the road to a salesperson show up here until they arrive.",
   },
   arrived: {
     title: "No arrived transfers yet",
@@ -94,7 +99,9 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
   if (!member.permissions.has("stock.read")) return <NoAccessState reason="no-permission" />;
 
   const params = await searchParams;
-  const tab: Tab = params.tab === "arrived" || params.tab === "cancelled" ? params.tab : "open";
+  const tab: Tab = typeof params.tab === "string" && Object.hasOwn(TABS, params.tab) ? (params.tab as Tab) : "initiated";
+  // Transfers still on their way can be moved along or cancelled.
+  const isOpen = tab === "initiated" || tab === "in_transit";
   const shown = shownCount(params.show, PAGE_SIZE);
   const canTransfer = member.permissions.has("stock.transfer");
   const organizationId = member.organization.id;
@@ -109,7 +116,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
     prisma.stockTransfer.findMany({
       where: { organizationId, status: { in: TABS[tab] } },
       // Open transfers oldest first, so the ones waiting longest are on top.
-      orderBy: tab === "open" ? { number: "asc" } : { number: "desc" },
+      orderBy: isOpen ? { number: "asc" } : { number: "desc" },
       take: shown,
       select: {
         id: true,
@@ -164,14 +171,15 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
     <UrlTabs
       defaultValue={tab}
       tabs={[
-        { value: "open", label: "Open", count: count(TABS.open) },
+        { value: "initiated", label: "Initiated", count: count(TABS.initiated) },
+        { value: "in_transit", label: "In transit", count: count(TABS.in_transit) },
         { value: "arrived", label: "Arrived", count: count(TABS.arrived) },
         { value: "cancelled", label: "Cancelled", count: count(TABS.cancelled) },
       ]}
       actions={
         canTransfer
           ? {
-              open: (
+              initiated: (
                 <InitiateTransferDialog
                   products={products.map((product) => ({ ...product, onHand: 0 }))}
                   warehouses={warehouses}
@@ -199,7 +207,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                     <TableHead className="hidden md:table-cell">Products</TableHead>
                     <TableHead className="text-right">Units</TableHead>
                     <TableHead>Status</TableHead>
-                    {canTransfer && tab === "open" ? (
+                    {canTransfer && isOpen ? (
                       <TableHead className="w-10">
                         <span className="sr-only">Actions</span>
                       </TableHead>
@@ -256,7 +264,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                           </Badge>
                           <Steps transfer={transfer} />
                         </TableCell>
-                        {canTransfer && tab === "open" ? (
+                        {canTransfer && isOpen ? (
                           <TableCell>
                             <TransferMenu
                               id={transfer.id}
