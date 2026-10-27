@@ -5,24 +5,27 @@ import { createToken, hashToken } from "@/lib/tokens"
 
 const INVITATION_DAYS = 7
 
+type NewMember = {
+  organizationId: string
+  email: string
+  name: string | null
+  phone: string | null
+  roleId: string
+  invitedById: string
+}
+
 /**
- * Adds someone to an organization as an invited member and returns the link
- * that lets them join. Their user is made now if they have none, with the
- * name given here and no password; the membership holds their role and phone.
- * Inviting the same address again updates them and replaces the earlier link.
- * Run inside a transaction, after checking they aren't a member already.
- * No email is sent yet: whoever invites passes the link on.
+ * Adds someone to an organization, as invited or straight in as active.
+ * Their user is made now if they have none, with the name given here and no
+ * password; the membership holds their role and phone. Adding the same
+ * address again updates them, and any invitation still open for them is
+ * revoked. Run inside a transaction, after checking they aren't a member
+ * already.
  */
-export async function createInvitation(
+export async function addMember(
   tx: Prisma.TransactionClient,
-  data: {
-    organizationId: string
-    email: string
-    name: string | null
-    phone: string | null
-    roleId: string
-    invitedById: string
-  }
+  data: NewMember,
+  status: "invited" | "active"
 ) {
   const { organizationId, email, name, phone, roleId, invitedById } = data
   const existing = await tx.user.findUnique({
@@ -42,30 +45,43 @@ export async function createInvitation(
     select: { id: true, status: true },
   })
   if (membership && membership.status !== "invited") throw new Error(`${email} is already a member.`)
+  // Joining now counts from today, not from when they were first invited.
+  const joined = status === "active" ? { status, joinedAt: new Date() } : {}
   const membershipId = membership
     ? (await tx.membership.update({
         where: { id: membership.id },
-        data: { roleId, phone, invitedById },
+        data: { roleId, phone, invitedById, ...joined },
         select: { id: true },
       })).id
     : (await tx.membership.create({
-        data: { organizationId, userId, roleId, phone, invitedById, status: "invited" },
+        data: { organizationId, userId, roleId, phone, invitedById, status },
         select: { id: true },
       })).id
-  // Invited with the Salesperson role, they're a salesperson from now on.
+  // Added with the Salesperson role, they're a salesperson from now on.
   await syncSalesperson(tx, membershipId)
 
-  const { token, tokenHash } = createToken()
   await tx.invitation.updateMany({
     where: { organizationId, email, status: "pending" },
     data: { status: "revoked" },
   })
+  return { membershipId }
+}
+
+/**
+ * Adds someone to an organization as an invited member and returns the link
+ * that lets them join. Inviting the same address again replaces the earlier
+ * link. Run inside a transaction, after checking they aren't a member
+ * already. No email is sent yet: whoever invites passes the link on.
+ */
+export async function createInvitation(tx: Prisma.TransactionClient, data: NewMember) {
+  const { membershipId } = await addMember(tx, data, "invited")
+  const { token, tokenHash } = createToken()
   await tx.invitation.create({
     data: {
-      organizationId,
-      email,
+      organizationId: data.organizationId,
+      email: data.email,
       tokenHash,
-      invitedById,
+      invitedById: data.invitedById,
       expiresAt: new Date(Date.now() + INVITATION_DAYS * 24 * 60 * 60 * 1000),
     },
   })
