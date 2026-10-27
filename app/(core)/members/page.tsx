@@ -4,6 +4,13 @@ import { Suspense } from "react";
 import { MailPlus, Users } from "lucide-react";
 import { InviteDialog } from "./invite-dialog";
 import { MemberMenu, RevokeInvitationMenu } from "./member-controls";
+import {
+  MobileCard,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { UrlTabs } from "@/components/url-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -125,6 +132,34 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
   // A link that ran out or was replaced leaves them without a pending one.
   const expiry = new Map(invitations.map((invitation) => [invitation.email.toLowerCase(), invitation.expiresAt]));
   const invite = canInvite ? <InviteDialog roles={roles} /> : null;
+  const rows = memberships.map((row) => {
+    const self = row.id === member.membershipId;
+    const name = row.user.name || row.user.email;
+    const touchesOwner = row.role.key === "owner" && !isOwner;
+    // Only a role you could give them yourself can be changed.
+    const roleEditable = canUpdate && roles.some((role) => role.id === row.role.id);
+    const removable = self || (canRemove && !touchesOwner);
+    const menu =
+      canUpdate || removable ? (
+        <MemberMenu
+          member={{
+            id: row.id,
+            name,
+            email: row.user.email,
+            phone: row.phone,
+            roleId: row.role.id,
+            roleName: row.role.name,
+          }}
+          roles={roles}
+          editable={canUpdate && !touchesOwner}
+          roleEditable={roleEditable}
+          removable={removable}
+          organizationName={organization.name}
+          self={self}
+        />
+      ) : null;
+    return { row, self, name, menu };
+  });
 
   return (
     <UrlTabs
@@ -140,7 +175,33 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
       <TabsContent value="members">
         <Card>
           <CardContent>
-            <Table>
+            <MobileCards>
+              {rows.map(({ row, self, name, menu }) => (
+                <MobileCard key={row.id}>
+                  <MobileCardHeader
+                    title={
+                      <>
+                        {name}
+                        {self ? <span className="text-muted-foreground"> (you)</span> : null}
+                      </>
+                    }
+                    badge={
+                      row.status === "suspended" ? <Badge variant="destructive">Suspended</Badge> : undefined
+                    }
+                    description={row.user.name ? row.user.email : undefined}
+                    aside={menu}
+                  />
+                  <MobileCardFields>
+                    <MobileCardField label="Role">
+                      <Badge variant="secondary">{row.role.name}</Badge>
+                    </MobileCardField>
+                    {row.phone ? <MobileCardField label="Phone">{formatPhone(row.phone)}</MobileCardField> : null}
+                    <MobileCardField label="Joined">{formatDate(row.joinedAt)}</MobileCardField>
+                  </MobileCardFields>
+                </MobileCard>
+              ))}
+            </MobileCards>
+            <Table className="hidden @4xl/main:table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -153,60 +214,33 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {memberships.map((row) => {
-                  const self = row.id === member.membershipId;
-                  const name = row.user.name || row.user.email;
-                  const touchesOwner = row.role.key === "owner" && !isOwner;
-                  // Only a role you could give them yourself can be changed.
-                  const roleEditable = canUpdate && roles.some((role) => role.id === row.role.id);
-                  const removable = self || (canRemove && !touchesOwner);
-                  return (
-                    <TableRow key={row.id}>
-                      <TableCell>
-                        <div className="font-medium">
-                          {name}
-                          {self ? <span className="text-muted-foreground"> (you)</span> : null}
-                        </div>
-                        {/* The contact column is hidden on small screens. */}
-                        <div className="text-xs text-muted-foreground md:hidden">{row.user.email}</div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Contact email={row.user.email} phone={row.phone} />
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{row.role.name}</Badge>
-                        {row.status === "suspended" ? (
-                          <Badge variant="destructive" className="ml-2">
-                            Suspended
-                          </Badge>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="hidden text-muted-foreground sm:table-cell">
-                        {formatDate(row.joinedAt)}
-                      </TableCell>
-                      <TableCell>
-                        {canUpdate || removable ? (
-                          <MemberMenu
-                            member={{
-                              id: row.id,
-                              name,
-                              email: row.user.email,
-                              phone: row.phone,
-                              roleId: row.role.id,
-                              roleName: row.role.name,
-                            }}
-                            roles={roles}
-                            editable={canUpdate && !touchesOwner}
-                            roleEditable={roleEditable}
-                            removable={removable}
-                            organizationName={organization.name}
-                            self={self}
-                          />
-                        ) : null}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {rows.map(({ row, self, name, menu }) => (
+                  <TableRow key={row.id}>
+                    <TableCell>
+                      <div className="font-medium">
+                        {name}
+                        {self ? <span className="text-muted-foreground"> (you)</span> : null}
+                      </div>
+                      {/* The contact column is hidden on small screens. */}
+                      <div className="text-xs text-muted-foreground md:hidden">{row.user.email}</div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Contact email={row.user.email} phone={row.phone} />
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{row.role.name}</Badge>
+                      {row.status === "suspended" ? (
+                        <Badge variant="destructive" className="ml-2">
+                          Suspended
+                        </Badge>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="hidden text-muted-foreground sm:table-cell">
+                      {formatDate(row.joinedAt)}
+                    </TableCell>
+                    <TableCell>{menu}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
@@ -218,7 +252,34 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
           {invited.length ? (
             <Card>
               <CardContent>
-                <Table>
+                <MobileCards>
+                  {invited.map((row) => {
+                    const expiresAt = expiry.get(row.user.email.toLowerCase());
+                    return (
+                      <MobileCard key={row.id}>
+                        <MobileCardHeader
+                          title={row.user.name || row.user.email}
+                          badge={!expiresAt || expiresAt <= now ? <Badge variant="destructive">Expired</Badge> : undefined}
+                          description={row.user.name ? row.user.email : undefined}
+                          aside={<RevokeInvitationMenu membershipId={row.id} email={row.user.email} />}
+                        />
+                        <MobileCardFields>
+                          <MobileCardField label="Role">
+                            <Badge variant="outline">{row.role.name}</Badge>
+                          </MobileCardField>
+                          {row.phone ? <MobileCardField label="Phone">{formatPhone(row.phone)}</MobileCardField> : null}
+                          <MobileCardField label="Invited by">
+                            {row.invitedBy?.name || row.invitedBy?.email || "Someone"}
+                          </MobileCardField>
+                          {expiresAt && expiresAt > now ? (
+                            <MobileCardField label="Expires">{formatDate(expiresAt)}</MobileCardField>
+                          ) : null}
+                        </MobileCardFields>
+                      </MobileCard>
+                    );
+                  })}
+                </MobileCards>
+                <Table className="hidden @4xl/main:table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
