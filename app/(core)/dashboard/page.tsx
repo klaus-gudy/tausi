@@ -112,7 +112,7 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
           .then((rows) => rows.map((row) => ({ id: row.id, name: salespersonName(row) })))
       : [],
     prisma.superDealer.count({
-      where: { organizationId, createdAt: { gte: windowStart() } },
+      where: { organizationId, deactivatedAt: null, createdAt: { gte: windowStart() } },
     }),
   ]);
   const held = showSalespeople ? await heldStock(organizationId) : new Map<string, Map<string, number>>();
