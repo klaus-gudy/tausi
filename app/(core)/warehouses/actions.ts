@@ -10,12 +10,13 @@ import {
   readText,
   type ActionResult,
 } from "@/lib/inventory";
+import { pickedDistrict } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 
 /**
  * Adds a warehouse, or edits one when the form carries its id. Only the name
- * is required; the region and district are picked from the organization's
- * places, and the storekeeper's name and phone are filled in from a member.
+ * is required; the place is picked from the organization's zones, regions and
+ * districts and stored as its district, and the storekeeper's name and phone are filled in from a member.
  */
 export async function saveWarehouse(
   _previous: ActionResult,
@@ -26,8 +27,6 @@ export async function saveWarehouse(
 
   const id = readText(formData.get("id"));
   const name = readText(formData.get("name"));
-  const regionKey = readText(formData.get("regionKey"), 100);
-  const districtKey = regionKey ? readText(formData.get("districtKey"), 100) : null;
   const typedPhone = readText(formData.get("phone"), 40);
   const phone = typedPhone ? normalizePhone(typedPhone) : null;
   if (!name) return { message: "Enter the warehouse's name." };
@@ -35,20 +34,12 @@ export async function saveWarehouse(
 
   const prisma = getPrisma();
   const organizationId = member.organization.id;
-  // A district is only found in its own region, so finding it checks both.
-  if (regionKey) {
-    const found = districtKey
-      ? await prisma.district.findUnique({
-          where: { organizationId_regionKey_key: { organizationId, regionKey, key: districtKey } },
-        })
-      : await prisma.region.findUnique({ where: { organizationId_key: { organizationId, key: regionKey } } });
-    if (!found) return { message: districtKey ? "Pick a district in that region." : "Pick the region from the list." };
-  }
+  const place = await pickedDistrict(organizationId, formData);
+  if ("message" in place) return place;
 
   const data = {
     name,
-    regionKey,
-    districtKey,
+    districtId: place.districtId,
     address: readText(formData.get("address"), 300),
     contactName: readText(formData.get("contactName")),
     phone,
