@@ -6,6 +6,13 @@ import { Store } from "lucide-react";
 
 import { AddDealerDialog } from "./dealer-dialog";
 import { DealerMenu } from "./dealer-menu";
+import {
+  MobileCard,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { Badge } from "@/components/ui/badge";
 import { UrlTabs } from "@/components/url-tabs";
@@ -135,7 +142,45 @@ async function SuperDealers({
         {dealers.length ? (
           <Card>
             <CardContent>
-              <Table>
+              <MobileCards>
+                {dealers.map((dealer) => {
+                  const last = lastIssued.get(dealer.id);
+                  const { district, signedAt, ...rest } = dealer;
+                  const region = district?.region;
+                  return (
+                    <MobileCard key={dealer.id} className="relative">
+                      <MobileCardHeader
+                        title={
+                          <Link href={`/super-dealers/${dealer.id}`} className="after:absolute after:inset-0">
+                            {dealerName(dealer)}
+                          </Link>
+                        }
+                        badge={signedAt ? <Badge variant="outline">Signed</Badge> : undefined}
+                        description={region ? [district?.name, region.name, region.zone.name].filter(Boolean).join(", ") : dealer.address}
+                        aside={
+                          canManage ? (
+                            // Above the card's link, so the menu opens instead.
+                            <div className="relative z-10">
+                              <DealerMenu dealer={{ ...rest, ...placeKeys(dealer) }} places={places} inactive={tab === "inactive"} />
+                            </div>
+                          ) : undefined
+                        }
+                      />
+                      <MobileCardFields>
+                        <MobileCardField label="Units supplied">
+                          <span className="tabular-nums">{formatCount(issued.get(dealer.id) ?? 0)}</span>
+                        </MobileCardField>
+                        <MobileCardField label="Last supplied">{last ? formatDay(last) : "Never"}</MobileCardField>
+                        {dealer.shopName && dealer.contactName ? (
+                          <MobileCardField label="Contact">{dealer.contactName}</MobileCardField>
+                        ) : null}
+                        {dealer.phone ? <MobileCardField label="Phone">{formatPhone(dealer.phone)}</MobileCardField> : null}
+                      </MobileCardFields>
+                    </MobileCard>
+                  );
+                })}
+              </MobileCards>
+              <Table className="hidden @4xl/main:table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Dealer</TableHead>
