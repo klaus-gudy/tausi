@@ -8,7 +8,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import { createInvitation } from "@/lib/invitations";
 import { assignableRoles, readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
-import { releaseSalesperson } from "@/lib/salespeople";
+import { releaseSalesperson, syncSalesperson } from "@/lib/salespeople";
 
 // Every action re-reads the session and membership: the page only hides
 // controls, it doesn't authorize anything.
@@ -197,6 +197,7 @@ export async function changeMemberRole(membershipId: string, roleId: string): Pr
       return { message: "Make someone else an owner first." };
     }
     await tx.membership.update({ where: { id: membershipId }, data: { roleId: role.id } });
+    await syncSalesperson(tx, membershipId);
     return { success: true, message: `Role changed to ${role.name}.` };
   });
 
