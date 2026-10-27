@@ -4,7 +4,11 @@ export function formatCount(value: number) {
   return count.format(value)
 }
 
-const date = new Intl.DateTimeFormat("en", { dateStyle: "medium" })
+// Moments are shown as a clock in Tanzania reads them, whatever zone the
+// server or browser runs in.
+const TANZANIA = "Africa/Dar_es_Salaam"
+
+const date = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: TANZANIA })
 
 export function formatDate(value: Date) {
   return date.format(value)
