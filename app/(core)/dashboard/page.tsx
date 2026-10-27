@@ -149,7 +149,7 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
         <StatTile
           label={`Supplied to dealers, last ${WINDOW_DAYS} days`}
           value={formatMoney(supply.value, true)}
-          delta={change(supply.value, supply.previousValue)}
+          delta={change(supply.units, supply.previousUnits)}
           detail={`${formatCompact(supply.units)} units`}
         />
         <StatTile
@@ -433,7 +433,7 @@ function StatTile({
 }: {
   label: string;
   value: string;
-  /** Percent change vs the 30 days before; up is good. */
+  /** Percent change in units vs the 30 days before; up is good. */
   delta?: number | null;
   detail?: string;
 }) {
@@ -457,7 +457,7 @@ const TRENDS = {
   flat: { className: "text-muted-foreground", Icon: Minus },
 };
 
-/** "+12% vs the 30 days before", with an arrow and colour for the direction. */
+/** "+12% in units vs the 30 days before", with an arrow and colour for the direction. */
 function Trend({ delta }: { delta: number }) {
   let trend = TRENDS.flat;
   if (delta > 0) trend = TRENDS.up;
@@ -467,7 +467,7 @@ function Trend({ delta }: { delta: number }) {
       <trend.Icon className="size-4" />
       <span>
         {delta > 0 ? "+" : ""}
-        {delta}% vs the {WINDOW_DAYS} days before
+        {delta}% in units vs the {WINDOW_DAYS} days before
       </span>
     </div>
   );
