@@ -11,6 +11,7 @@ import {
   readText,
   type ActionResult,
 } from "@/lib/inventory";
+import { pickedDistrict } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 
 // The biggest signature accepted. A phone-sized pad makes 10–60 KB.
@@ -22,8 +23,8 @@ export type OnboardResult = ActionResult & { id?: string };
 /**
  * The dealer fields shared by the office form and onboarding, checked. A
  * dealer needs a phone, and a shop name or a contact name; the rest is
- * optional. The region and district are picked from the organization's
- * places. Notes are only saved from a form that has them, so the office form,
+ * optional. The place is picked from the organization's zones, regions and
+ * districts, and stored as its district. Notes are only saved from a form that has them, so the office form,
  * which doesn't, leaves any a dealer already has.
  */
 async function readDealer(formData: FormData, organizationId: string) {
@@ -34,24 +35,14 @@ async function readDealer(formData: FormData, organizationId: string) {
   const email = readText(formData.get("email"))?.toLowerCase() ?? null;
   const typedTin = readText(formData.get("tin"), 20);
   const tin = typedTin ? normalizeTin(typedTin) : null;
-  const regionKey = readText(formData.get("regionKey"), 100);
-  const districtKey = regionKey ? readText(formData.get("districtKey"), 100) : null;
   if (!shopName && !contactName) return "Enter a shop name, a contact name, or both.";
   if (!typedPhone) return "Enter the dealer's phone number.";
   if (!phone) return "Enter a phone number like 0754 123 456.";
   if (email && !isEmail(email)) return "Enter a valid email address, or leave it empty.";
   if (typedTin && !tin) return "Enter the TIN as 9 digits, like 123-456-789, or leave it empty.";
 
-  // A district is only found in its own region, so finding it checks both.
-  if (regionKey) {
-    const prisma = getPrisma();
-    const found = districtKey
-      ? await prisma.district.findUnique({
-          where: { organizationId_regionKey_key: { organizationId, regionKey, key: districtKey } },
-        })
-      : await prisma.region.findUnique({ where: { organizationId_key: { organizationId, key: regionKey } } });
-    if (!found) return districtKey ? "Pick a district in that region." : "Pick the region from the list.";
-  }
+  const place = await pickedDistrict(organizationId, formData);
+  if ("message" in place) return place.message;
 
   return {
     shopName,
@@ -60,8 +51,7 @@ async function readDealer(formData: FormData, organizationId: string) {
     email,
     tin,
     businessLicence: readText(formData.get("businessLicence"), 50),
-    regionKey,
-    districtKey,
+    districtId: place.districtId,
     address: readText(formData.get("address"), 300),
     ...(formData.has("notes") ? { notes: readText(formData.get("notes"), 1000) } : {}),
   };
