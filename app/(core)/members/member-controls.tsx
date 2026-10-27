@@ -132,10 +132,10 @@ export function MemberMenu({
 }
 
 export function RevokeInvitationMenu({
-  invitationId,
+  membershipId,
   email,
 }: {
-  invitationId: string;
+  membershipId: string;
   email: string;
 }) {
   return (
@@ -146,7 +146,7 @@ export function RevokeInvitationMenu({
       description="The link they were sent will stop working."
       confirmLabel="Revoke"
       pendingLabel="Revoking…"
-      action={() => revokeInvitation(invitationId)}
+      action={() => revokeInvitation(membershipId)}
     />
   );
 }
