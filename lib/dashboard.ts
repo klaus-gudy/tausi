@@ -87,10 +87,13 @@ export async function readStoreStock(organizationId: string) {
 export async function readSupply(organizationId: string) {
   const prisma = getPrisma()
   const [windows, weeks, dealers] = await Promise.all([
-    prisma.$queryRaw<{ current_units: bigint; current_value: bigint; previous_value: bigint }[]>`
+    prisma.$queryRaw<{ current_units: bigint; current_value: bigint; previous_units: bigint; previous_value: bigint }[]>`
       WITH supply AS (${supplyRows(organizationId)})
       SELECT COALESCE(SUM(units) FILTER (WHERE day > ${TODAY} - ${WINDOW_DAYS}::int), 0) AS current_units,
              COALESCE(SUM(value) FILTER (WHERE day > ${TODAY} - ${WINDOW_DAYS}::int), 0) AS current_value,
+             COALESCE(SUM(units) FILTER (
+               WHERE day > ${TODAY} - ${2 * WINDOW_DAYS}::int AND day <= ${TODAY} - ${WINDOW_DAYS}::int
+             ), 0) AS previous_units,
              COALESCE(SUM(value) FILTER (
                WHERE day > ${TODAY} - ${2 * WINDOW_DAYS}::int AND day <= ${TODAY} - ${WINDOW_DAYS}::int
              ), 0) AS previous_value
@@ -129,6 +132,8 @@ export async function readSupply(organizationId: string) {
   return {
     units: Number(window.current_units),
     value: Number(window.current_value),
+    // Units, unlike value, don't move when a price changes, so compare these.
+    previousUnits: Number(window.previous_units),
     previousValue: Number(window.previous_value),
     trend,
     activeDealers: dealers.length,
