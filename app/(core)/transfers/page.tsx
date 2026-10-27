@@ -35,6 +35,7 @@ import { activeWarehouses, stockByWarehouse } from "@/lib/inventory";
 import { currentPage } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
+import { BY_NAME, SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
 
 export const metadata: Metadata = {
@@ -138,7 +139,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
         arrivedAt: true,
         cancelledAt: true,
         acknowledgedAt: true,
-        salesperson: { select: { name: true, zone: { select: { name: true } } } },
+        salesperson: { select: { ...SALESPERSON_PERSON, zone: { select: { name: true } } } },
         warehouse: { select: { name: true } },
         createdBy: { select: { name: true, email: true } },
         dispatchedBy: { select: { name: true, email: true } },
@@ -164,8 +165,8 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
     canTransfer
       ? prisma.salesperson.findMany({
           where: { organizationId, deactivatedAt: null },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true, zone: { select: { name: true } } },
+          orderBy: BY_NAME,
+          select: { id: true, ...SALESPERSON_PERSON, zone: { select: { name: true } } },
         })
       : [],
   ]);
@@ -188,7 +189,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                   stock={stock}
                   salespeople={salespeople.map((salesperson) => ({
                     id: salesperson.id,
-                    name: salesperson.name,
+                    name: salespersonName(salesperson),
                     zone: salesperson.zone?.name ?? null,
                   }))}
                 />
@@ -235,7 +236,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                         </TableCell>
                         <TableCell className="hidden md:table-cell">{transfer.warehouse.name}</TableCell>
                         <TableCell>
-                          <div>{transfer.salesperson.name}</div>
+                          <div>{salespersonName(transfer.salesperson)}</div>
                           {transfer.salesperson.zone ? (
                             <div className="text-xs text-muted-foreground">
                               {transfer.salesperson.zone.name}
@@ -276,7 +277,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                           <div className="flex items-center justify-end gap-1">
                             <TransferTimeline
                               name={name}
-                              route={`${transfer.warehouse.name} to ${transfer.salesperson.name}`}
+                              route={`${transfer.warehouse.name} to ${salespersonName(transfer.salesperson)}`}
                               steps={timeline(transfer)}
                             />
                             {canTransfer && isOpen ? (
