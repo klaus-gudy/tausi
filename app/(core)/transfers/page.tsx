@@ -7,6 +7,7 @@ import { InitiateTransferDialog } from "./transfer-dialog";
 import { TransferMenu } from "./transfer-menu";
 import { TransferTimeline, type TimelineStep } from "./transfer-timeline";
 import { NoAccessState } from "@/components/no-access-state";
+import { ProductName } from "@/components/product-name";
 import { TablePagination } from "@/components/table-pagination";
 import { UrlTabs } from "@/components/url-tabs";
 import { Badge } from "@/components/ui/badge";
@@ -245,7 +246,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                           <ul className="text-sm">
                             {transfer.movements.map((line) => (
                               <li key={line.id}>
-                                {formatCount(-line.quantity)} × {line.product.name}
+                                {formatCount(-line.quantity)} × <ProductName name={line.product.name} />
                                 {line.product.size ? (
                                   <span className="text-muted-foreground"> {line.product.size}</span>
                                 ) : null}
