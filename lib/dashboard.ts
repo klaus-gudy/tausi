@@ -1,5 +1,6 @@
 import { Prisma } from "@/lib/generated/prisma/client"
 import { getPrisma } from "@/lib/prisma"
+import { SALESPERSON_PERSON } from "@/lib/salespeople"
 
 // The dashboard's numbers. Values are units times the product's current
 // selling price, so they show what the stock is worth at today's prices, not
@@ -181,7 +182,7 @@ export async function readStuckTransfers(organizationId: string) {
       status: true,
       createdAt: true,
       dispatchedAt: true,
-      salesperson: { select: { name: true } },
+      salesperson: { select: SALESPERSON_PERSON },
     },
   })
   return transfers.map((transfer) => ({
