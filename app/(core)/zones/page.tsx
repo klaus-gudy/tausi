@@ -52,7 +52,7 @@ async function Zones() {
   await connection();
   const member = await readActiveMember();
   if (!member) return <NoAccessState reason="no-organization" />;
-  if (!member.permissions.has("dealers.read")) return <NoAccessState reason="no-permission" />;
+  if (!member.permissions.has("zones.read")) return <NoAccessState reason="no-permission" />;
 
   const organizationId = member.organization.id;
   const prisma = getPrisma();
