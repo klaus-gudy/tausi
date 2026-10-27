@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Package, UserCheck } from "lucide-react";
 
 import { NoAccessState } from "@/components/no-access-state";
+import { ProductName } from "@/components/product-name";
 import { UrlTabs } from "@/components/url-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -185,7 +186,7 @@ function ByProduct({
             {rows.map(({ product, warehouseUnits, transit, field, total }) => (
               <TableRow key={product.id}>
                 <TableCell>
-                  <div className="font-medium">{product.name}</div>
+                  <ProductName name={product.name} className="block font-medium" />
                   <div className="text-xs text-muted-foreground">
                     {product.code}
                     {product.size ? ` · ${product.size}` : ""}
@@ -270,7 +271,7 @@ function BySalesperson({
                 <TableRow key={`${holder.id}-${product.id}`}>
                   <TableCell className="font-medium">{index === 0 ? holder.name : null}</TableCell>
                   <TableCell>
-                    {product.name}
+                    <ProductName name={product.name} />
                     {product.size ? <span className="text-muted-foreground"> · {product.size}</span> : null}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatCount(units)}</TableCell>
