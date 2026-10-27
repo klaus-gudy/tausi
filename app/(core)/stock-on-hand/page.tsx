@@ -3,6 +3,13 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Package, UserCheck } from "lucide-react";
 
+import {
+  MobileCard,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { ProductName } from "@/components/product-name";
 import { UrlTabs } from "@/components/url-tabs";
@@ -170,7 +177,35 @@ function ByProduct({
   return (
     <Card>
       <CardContent>
-        <Table>
+        <MobileCards>
+          {rows.map(({ product, warehouseUnits, transit, field, total }) => (
+            <MobileCard key={product.id}>
+              <MobileCardHeader
+                title={product.name}
+                description={[product.code, product.size].filter(Boolean).join(" · ")}
+                aside={<span className="font-medium tabular-nums">{formatCount(total)}</span>}
+              />
+              <MobileCardFields>
+                {warehouses.map((warehouse, index) => (
+                  <MobileCardField key={warehouse.id} label={`${warehouse.name}${warehouse.inactive ? " (inactive)" : ""}`}>
+                    <Units units={warehouseUnits[index]} />
+                  </MobileCardField>
+                ))}
+                <MobileCardField label="In transit">
+                  <Units units={transit} />
+                </MobileCardField>
+                <MobileCardField label="With salespeople">
+                  <Units units={field} />
+                </MobileCardField>
+              </MobileCardFields>
+            </MobileCard>
+          ))}
+        </MobileCards>
+        {/* The table's totals row, for the cards. */}
+        <p className="pt-3 text-sm text-muted-foreground @4xl/main:hidden">
+          All products: <span className="font-medium text-foreground tabular-nums">{formatCount(sum((row) => row.total))}</span> units
+        </p>
+        <Table className="hidden @4xl/main:table">
           <TableHeader>
             <TableRow>
               <TableHead>Product</TableHead>
@@ -227,6 +262,11 @@ function ByProduct({
   );
 }
 
+/** A count; nothing held reads as a quiet dash. */
+function Units({ units }: { units: number }) {
+  return units ? <span className="tabular-nums">{formatCount(units)}</span> : <span className="text-muted-foreground">—</span>;
+}
+
 /** A right-aligned count; nothing held reads as a quiet dash. */
 function UnitsCell({ units, className }: { units: number; className?: string }) {
   return (
@@ -260,7 +300,28 @@ function BySalesperson({
   return (
     <Card>
       <CardContent>
-        <Table>
+        <MobileCards>
+          {holders.map((holder) => (
+            <MobileCard key={holder.id}>
+              <MobileCardHeader
+                title={holder.name}
+                aside={
+                  <span className="font-medium tabular-nums">
+                    {formatCount(holder.products.reduce((total, { units }) => total + units, 0))} units
+                  </span>
+                }
+              />
+              <MobileCardFields>
+                {holder.products.map(({ product, units }) => (
+                  <MobileCardField key={product.id} label={[product.name, product.size].filter(Boolean).join(" · ")}>
+                    <span className="tabular-nums">{formatCount(units)}</span>
+                  </MobileCardField>
+                ))}
+              </MobileCardFields>
+            </MobileCard>
+          ))}
+        </MobileCards>
+        <Table className="hidden @4xl/main:table">
           <TableHeader>
             <TableRow>
               <TableHead>Salesperson</TableHead>
