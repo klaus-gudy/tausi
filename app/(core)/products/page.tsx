@@ -5,6 +5,13 @@ import { Package } from "lucide-react";
 
 import { AddProductDialog } from "./product-dialog";
 import { ProductMenu } from "./product-menu";
+import {
+  MobileCard,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { ProductName } from "@/components/product-name";
 import { UrlTabs } from "@/components/url-tabs";
@@ -93,7 +100,26 @@ async function Products({ searchParams }: Pick<PageProps<"/products">, "searchPa
         {products.length ? (
           <Card>
             <CardContent>
-              <Table>
+              <MobileCards>
+                {products.map((product) => (
+                  <MobileCard key={product.id}>
+                    <MobileCardHeader
+                      title={product.name}
+                      description={[product.size, product.code].filter(Boolean).join(" · ")}
+                      aside={canManage ? <ProductMenu product={product} archived={tab === "archived"} /> : undefined}
+                    />
+                    <MobileCardFields>
+                      <MobileCardField label="Selling price">
+                        <span className="tabular-nums">{formatCount(product.sellingPrice)}</span>
+                      </MobileCardField>
+                      <MobileCardField label="On hand">
+                        <span className="tabular-nums">{formatCount(onHand.get(product.id) ?? 0)}</span>
+                      </MobileCardField>
+                    </MobileCardFields>
+                  </MobileCard>
+                ))}
+              </MobileCards>
+              <Table className="hidden @4xl/main:table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
