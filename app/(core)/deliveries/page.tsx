@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
 import type { StockTransferStatus } from "@/lib/generated/prisma/client";
+import { dealerScope } from "@/lib/dealer-access";
 import { byDealerName, dealerName } from "@/lib/dealers";
 import { deliveryNumber, heldStock, readOwnSalesperson } from "@/lib/deliveries";
 import { formatCount, formatDate, formatDay, formatTime } from "@/lib/format";
@@ -122,7 +123,8 @@ async function Deliveries({ searchParams }: Pick<PageProps<"/deliveries">, "sear
     prisma.delivery.count({ where: { organizationId, ...(salespersonId ? { salespersonId } : {}) } }),
     tab === "stock"
       ? prisma.superDealer.findMany({
-          where: { organizationId, deactivatedAt: null },
+          // Only the dealers in the places they cover, unless they see them all.
+          where: { ...(await dealerScope(member)), deactivatedAt: null },
           select: {
             id: true,
             shopName: true,
