@@ -26,7 +26,7 @@ import {
 import type { StockMovementType } from "@/lib/generated/prisma/client";
 import { dealerName } from "@/lib/dealers";
 import { formatDate, formatSigned, formatTime } from "@/lib/format";
-import { pageNumber } from "@/lib/list-size";
+import { currentPage } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 import { transferNumber } from "@/lib/transfers";
@@ -78,8 +78,7 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
   const where = { organizationId: member.organization.id, holder: "warehouse" as const };
   const prisma = getPrisma();
   const total = await prisma.stockMovement.count({ where });
-  // A page past the end shows the last one.
-  const page = Math.min(pageNumber((await searchParams).page), Math.max(1, Math.ceil(total / PAGE_SIZE)));
+  const page = currentPage((await searchParams).page, total, PAGE_SIZE);
   const movements = await prisma.stockMovement.findMany({
     where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
