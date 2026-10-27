@@ -51,7 +51,6 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
         where: { id, organizationId: member.organization.id },
         select: {
           supplierName: true,
-          reference: true,
           note: true,
           receivedOn: true,
           createdAt: true,
@@ -63,7 +62,6 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
             select: {
               id: true,
               quantity: true,
-              unitCost: true,
               product: { select: { name: true, code: true, size: true } },
               reversedBy: { select: { id: true } },
             },
@@ -73,11 +71,10 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
     : null;
   if (!receipt) return <NotFoundState />;
 
-  const { lines, units, value } = receiptLines(receipt.stockMovements);
+  const { lines, units } = receiptLines(receipt.stockMovements);
   const details: [string, string][] = [
     ["Received on", formatDay(receipt.receivedOn)],
     ["Warehouse", receipt.warehouse.name],
-    ["Delivery note / invoice", receipt.reference ?? "—"],
     ["Recorded by", receipt.receivedBy?.name || receipt.receivedBy?.email || "—"],
     ["Recorded on", formatDate(receipt.createdAt)],
   ];
@@ -125,8 +122,6 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
                 <TableHead>Product</TableHead>
                 <TableHead className="hidden sm:table-cell">Size</TableHead>
                 <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="hidden text-right sm:table-cell">Unit cost</TableHead>
-                <TableHead className="text-right">Line total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -143,12 +138,6 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
                   <TableCell className={`text-right tabular-nums ${line.reversed ? "line-through" : ""}`}>
                     {formatCount(line.quantity)}
                   </TableCell>
-                  <TableCell className="hidden text-right tabular-nums sm:table-cell">
-                    {line.unitCost === null ? "—" : formatCount(line.unitCost)}
-                  </TableCell>
-                  <TableCell className={`text-right tabular-nums ${line.reversed ? "line-through" : ""}`}>
-                    {line.unitCost === null ? "—" : formatCount(line.quantity * line.unitCost)}
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -157,10 +146,6 @@ async function Receipt({ params }: Pick<PageProps<"/goods-received/[id]">, "para
                 <TableCell className="font-medium">Total</TableCell>
                 <TableCell className="hidden sm:table-cell" />
                 <TableCell className="text-right font-medium tabular-nums">{formatCount(units)}</TableCell>
-                <TableCell className="hidden sm:table-cell" />
-                <TableCell className="text-right font-medium tabular-nums">
-                  {value === null ? "—" : formatCount(value)}
-                </TableCell>
               </TableRow>
             </TableFooter>
           </Table>
