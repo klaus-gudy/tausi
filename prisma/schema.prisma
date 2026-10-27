@@ -471,7 +471,8 @@ model StockMovement {
   createdBy    User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([organizationId, occurredOn])
-  @@index([organizationId, holder])
+  // Movement history: one holder's rows, newest first.
+  @@index([organizationId, holder, createdAt(sort: Desc), id(sort: Desc)])
   @@index([productId])
   @@index([warehouseId])
   @@index([superDealerId])
@@ -725,7 +726,9 @@ model Delivery {
   lines        DeliveryLine[]
 
   @@unique([organizationId, number])
-  @@index([salespersonId])
+  // The deliveries list, newest first: everyone's, or one salesperson's.
+  @@index([organizationId, deliveredOn(sort: Desc), number(sort: Desc)])
+  @@index([salespersonId, deliveredOn(sort: Desc), number(sort: Desc)])
   @@index([superDealerId])
   @@map("deliveries")
 }
