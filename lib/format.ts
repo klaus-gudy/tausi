@@ -14,6 +14,13 @@ export function formatDate(value: Date) {
   return date.format(value)
 }
 
+const time = new Intl.DateTimeFormat("en", { timeStyle: "short", timeZone: TANZANIA })
+
+/** "9:20 AM" in Tanzania. */
+export function formatTime(value: Date) {
+  return time.format(value)
+}
+
 // Calendar days (@db.Date) arrive as UTC midnight; format them in UTC so they
 // don't shift to the previous day west of Greenwich.
 const day = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" })
