@@ -65,7 +65,7 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
   const prisma = getPrisma();
   const total = await prisma.stockReceipt.count({ where: { organizationId } });
   const page = currentPage((await searchParams).page, total, PAGE_SIZE);
-  const [receipts, products, warehouses, onHand] = await Promise.all([
+  const [receipts, products, warehouses, suppliers, onHand] = await Promise.all([
     prisma.stockReceipt.findMany({
       where: { organizationId },
       orderBy: [{ receivedOn: "desc" }, { createdAt: "desc" }],
@@ -97,6 +97,13 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
         })
       : [],
     canReceive ? activeWarehouses(organizationId) : [],
+    canReceive
+      ? prisma.supplier.findMany({
+          where: { organizationId },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : [],
     canReceive ? stockOnHand(organizationId) : new Map<string, number>(),
   ]);
 
@@ -107,6 +114,7 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
           <ReceiveStockDialog
             products={products.map((product) => ({ ...product, onHand: onHand.get(product.id) ?? 0 }))}
             warehouses={warehouses}
+            suppliers={suppliers}
           />
         </div>
       ) : null}
