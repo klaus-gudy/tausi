@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, MapPinned, Plus, UserRound } from "lucide-react";
+import { MapPinned, Plus, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { saveSalesperson, type SalespersonResult } from "./actions";
@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -48,8 +47,6 @@ export type EditableSalesperson = {
 
 export type ZoneOption = { key: string; name: string };
 
-/** A role a new salesperson can be invited with. */
-export type RoleOption = { id: string; key: string; name: string };
 
 const initialState: SalespersonResult = { message: "" };
 
@@ -59,13 +56,7 @@ const NONE = "none";
 const DIALOG_CLASS = "max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl";
 
 /** The "Add salesperson" button and its dialog. */
-export function AddSalespersonDialog({
-  zones,
-  roles,
-}: {
-  zones: ZoneOption[];
-  roles: RoleOption[];
-}) {
+export function AddSalespersonDialog({ zones }: { zones: ZoneOption[] }) {
   const [open, setOpen] = useState(false);
   // Remounting the form clears it for the next salesperson.
   const [formKey, setFormKey] = useState(0);
@@ -88,7 +79,6 @@ export function AddSalespersonDialog({
         <SalespersonForm
           key={formKey}
           zones={zones}
-          roles={roles}
           onAnother={() => setFormKey((key) => key + 1)}
           onSaved={() => setOpen(false)}
         />
@@ -127,13 +117,11 @@ export function EditSalespersonDialog({
 function SalespersonForm({
   salesperson,
   zones,
-  roles = [],
   onAnother,
   onSaved,
 }: {
   salesperson?: EditableSalesperson;
   zones: ZoneOption[];
-  roles?: RoleOption[];
   onAnother?: () => void;
   onSaved: () => void;
 }) {
@@ -150,9 +138,6 @@ function SalespersonForm({
     initialState
   );
   const [zoneKey, setZoneKey] = useState(salesperson?.zoneKey ?? NONE);
-  const [roleId, setRoleId] = useState(
-    (roles.find((role) => role.key === "salesperson") ?? roles[0])?.id ?? ""
-  );
 
   if (state.success && state.link) {
     return (
@@ -184,7 +169,7 @@ function SalespersonForm({
         <DialogDescription>
           {salesperson
             ? "Field staff the store sends stock to."
-            : "Field staff the store sends stock to. They join as a member, so they can sign in."}
+            : "Field staff the store sends stock to. They're invited as a member with the Salesperson role, and sign in to acknowledge stock and supply dealers."}
         </DialogDescription>
       </DialogHeader>
       {salesperson ? <input type="hidden" name="id" value={salesperson.id} /> : null}
@@ -235,33 +220,6 @@ function SalespersonForm({
             </Field>
           </div>
         </FormSection>
-        {salesperson ? null : (
-          <FormSection
-            icon={KeyRound}
-            title="Sign-in"
-            description="They're invited with the email above, and sign in to acknowledge stock and supply dealers."
-          >
-            <Field>
-              <FieldLabel htmlFor="salesperson-role">Role</FieldLabel>
-              <input type="hidden" name="roleId" value={roleId} />
-              <Select value={roleId} onValueChange={setRoleId}>
-                <SelectTrigger id="salesperson-role" className="w-full">
-                  <SelectValue placeholder="Pick a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      {role.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldDescription>
-                Someone already on Members becomes a salesperson straight away and keeps their role.
-              </FieldDescription>
-            </Field>
-          </FormSection>
-        )}
         <FormSection icon={MapPinned} title="Coverage" description="The zone they work in.">
           <Field>
             <FieldLabel htmlFor="salesperson-zone">Zone</FieldLabel>
