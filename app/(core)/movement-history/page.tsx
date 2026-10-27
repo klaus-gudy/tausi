@@ -30,6 +30,7 @@ import { formatDate, formatSigned, formatTime } from "@/lib/format";
 import { currentPage } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
+import { SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 import { transferNumber } from "@/lib/transfers";
 
 export const metadata: Metadata = {
@@ -96,7 +97,7 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
       warehouse: { select: { name: true } },
       superDealer: { select: { shopName: true, contactName: true } },
       receipt: { select: { supplierName: true, reference: true, note: true } },
-      transfer: { select: { number: true, salesperson: { select: { name: true } } } },
+      transfer: { select: { number: true, salesperson: { select: SALESPERSON_PERSON } } },
       reverses: { select: { type: true } },
       createdBy: { select: { name: true, email: true } },
       reversedBy: { select: { id: true } },
@@ -199,13 +200,13 @@ type Party = { name: string; detail?: string };
 function counterpart(movement: {
   type: StockMovementType;
   superDealer: Parameters<typeof dealerName>[0] | null;
-  transfer: { number: number; salesperson: { name: string } } | null;
+  transfer: { number: number; salesperson: Parameters<typeof salespersonName>[0] } | null;
   receipt: { supplierName: string | null } | null;
   reverses: { type: StockMovementType } | null;
 }): Party {
   if (movement.superDealer) return { name: dealerName(movement.superDealer), detail: "Super dealer" };
   if (movement.transfer) {
-    return { name: movement.transfer.salesperson.name, detail: transferNumber(movement.transfer.number) };
+    return { name: salespersonName(movement.transfer.salesperson), detail: transferNumber(movement.transfer.number) };
   }
   if (movement.receipt) return { name: movement.receipt.supplierName ?? "Unnamed supplier", detail: "Supplier" };
   // A count's difference, or undoing one, has no one on the other side.
