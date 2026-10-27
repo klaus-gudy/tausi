@@ -6,6 +6,7 @@ import { Package } from "lucide-react";
 import { AddProductDialog } from "./product-dialog";
 import { ProductMenu } from "./product-menu";
 import { NoAccessState } from "@/components/no-access-state";
+import { ProductName } from "@/components/product-name";
 import { UrlTabs } from "@/components/url-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -112,7 +113,7 @@ async function Products({ searchParams }: Pick<PageProps<"/products">, "searchPa
                     return (
                       <TableRow key={product.id}>
                         <TableCell>
-                          <div className="font-medium">{product.name}</div>
+                          <ProductName name={product.name} className="block font-medium" />
                           <div className="text-xs text-muted-foreground">{product.code}</div>
                         </TableCell>
                         <TableCell className="hidden text-muted-foreground sm:table-cell">
