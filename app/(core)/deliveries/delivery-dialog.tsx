@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Truck } from "lucide-react";
+import { Package, Store, Truck } from "lucide-react";
 
 import { recordDelivery } from "./actions";
 import {
@@ -12,6 +12,7 @@ import {
   type StockProduct,
 } from "../stock/stock-dialogs";
 import { DatePicker } from "@/components/date-picker";
+import { FormSection } from "@/components/form-section";
 import { Button } from "@/components/ui/button";
 import {
   DialogDescription,
@@ -20,7 +21,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -28,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 
 export type DeliveryDealer = { id: string; name: string; place: string | null };
 
@@ -67,39 +66,35 @@ function DeliveryForm({
         <DialogTitle>Supply a super dealer</DialogTitle>
         <DialogDescription>Record what you handed over. It comes off the stock you hold.</DialogDescription>
       </DialogHeader>
-      <FieldGroup className="py-4">
-        <div className="grid gap-5 sm:grid-cols-3">
-          <Field>
-            <FieldLabel htmlFor="delivery-dealer">Super dealer</FieldLabel>
-            <input type="hidden" name="superDealerId" value={dealerId} />
-            <Select value={dealerId} onValueChange={setDealerId}>
-              <SelectTrigger id="delivery-dealer" className="w-full">
-                <SelectValue placeholder="Pick a dealer" />
-              </SelectTrigger>
-              <SelectContent>
-                {dealers.map((dealer) => (
-                  <SelectItem key={dealer.id} value={dealer.id}>
-                    {dealer.name}
-                    {dealer.place ? <span className="text-muted-foreground">{dealer.place}</span> : null}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="delivery-reference">Delivery note / receipt</FieldLabel>
-            <Input id="delivery-reference" name="reference" autoComplete="off" maxLength={100} />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="delivery-day">Delivered on</FieldLabel>
-            <DatePicker id="delivery-day" name="deliveredOn" defaultValue={day} maxDate={day} />
-          </Field>
-        </div>
-        <ProductLines products={products} showOnHand onHandLabel="with you" />
-        <Field>
-          <FieldLabel htmlFor="delivery-note">Note</FieldLabel>
-          <Textarea id="delivery-note" name="note" maxLength={1000} rows={2} />
-        </Field>
+      <FieldGroup className="gap-4 py-4">
+        <FormSection icon={Store} title="Dealer" description="Who you supplied and on what day.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="delivery-dealer">Super dealer</FieldLabel>
+              <input type="hidden" name="superDealerId" value={dealerId} />
+              <Select value={dealerId} onValueChange={setDealerId}>
+                <SelectTrigger id="delivery-dealer" className="w-full">
+                  <SelectValue placeholder="Pick a dealer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dealers.map((dealer) => (
+                    <SelectItem key={dealer.id} value={dealer.id}>
+                      {dealer.name}
+                      {dealer.place ? <span className="text-muted-foreground">{dealer.place}</span> : null}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="delivery-day">Delivered on</FieldLabel>
+              <DatePicker id="delivery-day" name="deliveredOn" defaultValue={day} maxDate={day} />
+            </Field>
+          </div>
+        </FormSection>
+        <FormSection icon={Package} title="Stock supplied" description="What you handed over, from the stock you hold.">
+          <ProductLines products={products} showOnHand onHandLabel="with you" />
+        </FormSection>
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
