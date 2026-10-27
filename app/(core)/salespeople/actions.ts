@@ -6,7 +6,6 @@ import { normalizePhone } from "@/lib/dealers";
 import { isEmail } from "@/lib/email";
 import {
   isUniqueViolation,
-  isUuid,
   memberWith,
   notAllowed,
   readText,
@@ -25,9 +24,10 @@ function revalidateSalespeople() {
 export type SalespersonResult = ActionResult & { link?: string; email?: string };
 
 /**
- * Adds a salesperson, or edits one when the form carries its id. A new
- * salesperson is a member too: someone already on Members is linked straight
- * away, anyone else gets an invitation whose link comes back to share.
+ * Adds a salesperson, or edits one when the form carries its id. A
+ * salesperson is a member plus the zone they cover, so adding someone new
+ * adds them as an invited member (the link to share comes back); someone
+ * already on Members just becomes a salesperson.
  */
 export async function saveSalesperson(
   _previous: SalespersonResult,
@@ -40,137 +40,110 @@ export async function saveSalesperson(
   const name = readText(formData.get("name"));
   const typedPhone = readText(formData.get("phone"), 40);
   const phone = typedPhone ? normalizePhone(typedPhone) : null;
-  const email = readText(formData.get("email"))?.toLowerCase() ?? null;
   const zoneKey = readText(formData.get("zoneKey"), 100);
+  const notes = readText(formData.get("notes"), 1000);
   if (!name) return { message: "Enter the salesperson's name." };
   if (typedPhone && !phone) return { message: "Enter a phone number like 0754 123 456, or leave it empty." };
-  if (email && !isEmail(email)) return { message: "Enter a valid email address." };
 
-  const prisma = getPrisma();
   const organizationId = member.organization.id;
   if (
     zoneKey &&
-    !(await prisma.zone.findUnique({ where: { organizationId_key: { organizationId, key: zoneKey } } }))
+    !(await getPrisma().zone.findUnique({ where: { organizationId_key: { organizationId, key: zoneKey } } }))
   ) {
     return { message: "Pick the zone from the list." };
   }
 
-  const data = { name, phone, email, zoneKey, notes: readText(formData.get("notes"), 1000) };
+  const person = { name, phone, zoneKey, notes };
   const result = id
-    ? await editSalesperson(member, id, data, readText(formData.get("userId"), 100))
-    : await addSalesperson(member, data, readText(formData.get("roleId"), 100));
+    ? await editSalesperson(member, id, person)
+    : await addSalesperson(
+        member,
+        person,
+        readText(formData.get("email"))?.toLowerCase() ?? null,
+        readText(formData.get("roleId"), 100)
+      );
   if (result.success) revalidateSalespeople();
   return result;
 }
 
-type SalespersonData = {
-  name: string;
-  phone: string | null;
-  email: string | null;
-  zoneKey: string | null;
-  notes: string | null;
-};
+type Person = { name: string; phone: string | null; zoneKey: string | null; notes: string | null };
 
 async function addSalesperson(
   member: ActiveMember,
-  data: SalespersonData,
+  { name, phone, zoneKey, notes }: Person,
+  email: string | null,
   roleId: string | null
 ): Promise<SalespersonResult> {
   if (!member.permissions.has("members.invite")) {
     return { message: "Adding a salesperson makes them a member, so you need permission to invite people." };
   }
-  const { email } = data;
-  if (!email) return { message: "Enter their email: it's what they sign in with." };
+  if (!email || !isEmail(email)) return { message: "Enter their email: it's what they sign in with." };
 
   const prisma = getPrisma();
   const organizationId = member.organization.id;
-  const [membership, invited] = await Promise.all([
-    prisma.membership.findFirst({
-      where: { organizationId, user: { email } },
-      select: { status: true, userId: true },
-    }),
-    prisma.invitation.findFirst({
-      where: { organizationId, email, status: "pending", salesperson: { isNot: null } },
-      select: { salesperson: { select: { name: true } } },
-    }),
-  ]);
+  const existing = await prisma.membership.findFirst({
+    where: { organizationId, user: { email } },
+    select: { id: true, status: true, salesperson: { select: { id: true } } },
+  });
+  if (existing?.salesperson) return { message: `${email} is already a salesperson.` };
 
+  // Already on Members: they become a salesperson with the role they have.
+  if (existing && existing.status !== "invited") {
+    if (existing.status === "suspended") return { message: `${email} is on Members but suspended.` };
+    await prisma.$transaction([
+      prisma.salesperson.create({ data: { organizationId, membershipId: existing.id, zoneKey, notes } }),
+      ...(phone ? [prisma.membership.update({ where: { id: existing.id }, data: { phone } })] : []),
+    ]);
+    return { success: true, message: `${name} added. They sign in as ${email}.` };
+  }
+
+  const role = (await assignableRoles(member)).find((role) => role.id === roleId);
+  if (!role) return { message: "Pick a role you're allowed to give." };
   try {
-    // Already a member: they sign in as the salesperson from now on.
-    if (membership) {
-      if (membership.status !== "active") return { message: `${email} is on Members but suspended.` };
-      const linked = await prisma.salesperson.findFirst({
-        where: { organizationId, userId: membership.userId },
-        select: { name: true },
-      });
-      if (linked) return { message: `${email} already signs in as ${linked.name}.` };
-      await prisma.salesperson.create({ data: { ...data, organizationId, userId: membership.userId } });
-      return { success: true, message: `${data.name} added. They sign in as ${email}.` };
-    }
-
-    if (invited?.salesperson) {
-      return { message: `${email} is already invited as ${invited.salesperson.name}.` };
-    }
-    const role = (await assignableRoles(member)).find((role) => role.id === roleId);
-    if (!role) return { message: "Pick a role you're allowed to give." };
     const { link } = await prisma.$transaction(async (tx) => {
       const invitation = await createInvitation(tx, {
         organizationId,
         email,
-        name: data.name,
-        phone: data.phone,
+        name,
+        phone,
         roleId: role.id,
         invitedById: member.userId,
       });
-      await tx.salesperson.create({ data: { ...data, organizationId, invitationId: invitation.id } });
+      await tx.salesperson.create({
+        data: { organizationId, membershipId: invitation.membershipId, zoneKey, notes },
+      });
       return invitation;
     });
     revalidatePath("/members");
-    return { success: true, message: `${data.name} added and invited.`, link, email };
+    return { success: true, message: `${name} added and invited.`, link, email };
   } catch (error) {
-    if (isUniqueViolation(error)) return { message: `There's already a salesperson called ${data.name}.` };
+    // Added twice at once: the second one finds the first's salesperson.
+    if (isUniqueViolation(error)) return { message: `${email} was just added. Check the list.` };
     throw error;
   }
 }
 
+/** Name goes to the user, phone to the membership, the rest to the salesperson. */
 async function editSalesperson(
   member: ActiveMember,
   id: string,
-  data: SalespersonData,
-  userId: string | null
+  { name, phone, zoneKey, notes }: Person
 ): Promise<SalespersonResult> {
   const prisma = getPrisma();
-  const organizationId = member.organization.id;
+  const salesperson = await prisma.salesperson.findFirst({
+    where: { id, organizationId: member.organization.id },
+    select: { membership: { select: { id: true, userId: true } } },
+  });
+  if (!salesperson) return { message: "That salesperson no longer exists." };
+  const { membership } = salesperson;
 
-  // The login must belong to an active member, and to no other salesperson.
-  if (userId) {
-    if (!isUuid(userId)) return { message: "Pick the login from the list of members." };
-    const [membership, linked] = await Promise.all([
-      prisma.membership.findFirst({
-        where: { organizationId, userId, status: "active" },
-        select: { id: true },
-      }),
-      prisma.salesperson.findFirst({
-        where: { organizationId, userId, id: { not: id } },
-        select: { name: true },
-      }),
-    ]);
-    if (!membership) return { message: "Pick the login from the list of members." };
-    if (linked) return { message: `That login is already linked to ${linked.name}.` };
-  }
-
-  try {
-    const { count } = await prisma.salesperson.updateMany({
-      where: { id, organizationId },
-      data: { ...data, userId },
-    });
-    if (!count) return { message: "That salesperson no longer exists." };
-  } catch (error) {
-    // The login was checked above, so a clash here is almost always the name.
-    if (isUniqueViolation(error)) return { message: `There's already a salesperson called ${data.name}, or that login is taken.` };
-    throw error;
-  }
-  return { success: true, message: `${data.name} saved.` };
+  await prisma.$transaction([
+    prisma.salesperson.update({ where: { id }, data: { zoneKey, notes } }),
+    prisma.membership.update({ where: { id: membership.id }, data: { phone } }),
+    prisma.user.update({ where: { id: membership.userId }, data: { name } }),
+  ]);
+  revalidatePath("/members");
+  return { success: true, message: `${name} saved.` };
 }
 
 /** Inactive salespeople can't be sent stock; their transfers stay on record. */
