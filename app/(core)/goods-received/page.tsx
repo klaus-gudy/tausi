@@ -73,7 +73,7 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
       take: PAGE_SIZE,
       select: {
         id: true,
-        supplierName: true,
+        supplier: { select: { name: true } },
         receivedOn: true,
         warehouse: { select: { name: true } },
         receivedBy: { select: { name: true, email: true } },
@@ -139,7 +139,7 @@ async function Receipts({ searchParams }: Pick<PageProps<"/goods-received">, "se
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{receipt.supplierName ?? "No supplier given"}</div>
+                        <div className="font-medium">{receipt.supplier.name}</div>
                       </TableCell>
                       <TableCell className="hidden max-w-xs md:table-cell">
                         <div className="truncate" title={summary}>
