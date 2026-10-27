@@ -8,6 +8,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import { createInvitation } from "@/lib/invitations";
 import { assignableRoles, readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
+import { releaseSalesperson } from "@/lib/salespeople";
 
 // Every action re-reads the session and membership: the page only hides
 // controls, it doesn't authorize anything.
@@ -97,8 +98,9 @@ export async function inviteMember(
 
   const prisma = getPrisma();
   const organizationId = member.organization.id;
+  // Someone invited before is invited again with a new link.
   const existing = await prisma.membership.findFirst({
-    where: { organizationId, user: { email } },
+    where: { organizationId, user: { email }, status: { not: "invited" } },
     select: { id: true },
   });
   if (existing) return { message: `${email} is already a member.` };
@@ -126,18 +128,43 @@ export async function inviteMember(
   return { success: true, message: `Invitation link created for ${email}.`, link, email };
 }
 
-export async function revokeInvitation(invitationId: string): Promise<Result> {
+/**
+ * Takes back an invitation: the invited member goes, and so does their user
+ * when it was only made for this invitation.
+ */
+export async function revokeInvitation(membershipId: string): Promise<Result> {
   const member = await memberWith("members.invite");
   if (!member) return notAllowed;
 
-  const { count } = await getPrisma().invitation.updateMany({
-    where: { id: invitationId, organizationId: member.organization.id, status: "pending" },
-    data: { status: "revoked" },
-  });
-  if (!count) return { message: "That invitation is no longer pending." };
+  const organizationId = member.organization.id;
+  const result = await getPrisma().$transaction(async (tx): Promise<Result> => {
+    const target = await tx.membership.findFirst({
+      where: { id: membershipId, organizationId, status: "invited" },
+      select: {
+        userId: true,
+        user: { select: { email: true, authAccounts: { select: { id: true }, take: 1 } } },
+      },
+    });
+    if (!target) return { message: "That invitation is no longer pending." };
+    const blocked = await releaseSalesperson(tx, membershipId);
+    if (blocked) return { message: blocked };
 
-  revalidatePath("/members");
-  return { success: true, message: "Invitation revoked." };
+    await tx.invitation.updateMany({
+      where: { organizationId, email: target.user.email, status: "pending" },
+      data: { status: "revoked" },
+    });
+    await tx.membership.delete({ where: { id: membershipId } });
+    if (!target.user.authAccounts.length && !(await tx.membership.count({ where: { userId: target.userId } }))) {
+      await tx.user.delete({ where: { id: target.userId } });
+    }
+    return { success: true, message: "Invitation revoked." };
+  });
+
+  if (result.success) {
+    revalidatePath("/members");
+    revalidatePath("/salespeople");
+  }
+  return result;
 }
 
 export async function changeMemberRole(membershipId: string, roleId: string): Promise<Result> {
@@ -193,7 +220,7 @@ export async function updateMember(_previous: Result, formData: FormData): Promi
   const prisma = getPrisma();
   const target = await prisma.membership.findFirst({
     where: { id: membershipId, organizationId: member.organization.id },
-    select: { roleId: true, role: { select: { key: true } } },
+    select: { userId: true, roleId: true, role: { select: { key: true } } },
   });
   if (!target) return { message: "That member is no longer here." };
   if (target.role.key === "owner" && member.role.key !== "owner") {
@@ -204,10 +231,13 @@ export async function updateMember(_previous: Result, formData: FormData): Promi
     const changed = await changeMemberRole(membershipId, roleId);
     if (!changed.success) return changed;
   }
-  await prisma.membership.update({
-    where: { id: membershipId },
-    data: { name: contact.name, phone: contact.phone },
-  });
+  // Their name is their user's, the same in every organization they're in.
+  await prisma.$transaction([
+    prisma.membership.update({ where: { id: membershipId }, data: { phone: contact.phone } }),
+    ...(contact.name
+      ? [prisma.user.update({ where: { id: target.userId }, data: { name: contact.name } })]
+      : []),
+  ]);
 
   revalidatePath("/members");
   return { success: true, message: "Member saved." };
@@ -236,6 +266,8 @@ export async function removeMember(membershipId: string): Promise<Result> {
     ) {
       return { message: "Make someone else an owner first." };
     }
+    const blocked = await releaseSalesperson(tx, membershipId);
+    if (blocked) return { message: blocked };
     await tx.membership.delete({ where: { id: membershipId } });
     await moveSessionsOut(tx, target.userId, member.organization.id);
     return {
