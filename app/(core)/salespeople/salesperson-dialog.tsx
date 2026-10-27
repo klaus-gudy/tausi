@@ -157,7 +157,7 @@ function SalespersonForm({
         <DialogDescription>
           {salesperson
             ? "Field staff the store sends stock to."
-            : "Field staff the store sends stock to. They're invited as a member with the Salesperson role, and sign in to acknowledge stock and supply dealers."}
+            : "Field staff the store sends stock to. They're invited as a member with the Salesperson role, and sign in to acknowledge stock and supply dealers. Add only makes them a member straight away, without an invitation."}
         </DialogDescription>
       </DialogHeader>
       {salesperson ? <input type="hidden" name="id" value={salesperson.id} /> : null}
@@ -222,6 +222,11 @@ function SalespersonForm({
         {state.message && !state.success ? <FieldError>{state.message}</FieldError> : null}
       </FieldGroup>
       <DialogFooter>
+        {salesperson ? null : (
+          <Button type="submit" variant="outline" name="intent" value="add" disabled={pending}>
+            Add only
+          </Button>
+        )}
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : submitLabel}
         </Button>
