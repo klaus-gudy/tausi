@@ -1,6 +1,41 @@
 import type { Prisma } from "@/lib/generated/prisma/client"
 import { getPrisma } from "@/lib/prisma"
-import { hashToken } from "@/lib/tokens"
+import { createToken, hashToken } from "@/lib/tokens"
+
+const INVITATION_DAYS = 7
+
+/**
+ * Creates an invitation and returns it with the link to share; inviting the
+ * same address again replaces its earlier link. Run inside a transaction.
+ * No email is sent yet: whoever invites passes the link on.
+ */
+export async function createInvitation(
+  tx: Prisma.TransactionClient,
+  data: {
+    organizationId: string
+    email: string
+    name: string | null
+    phone: string | null
+    roleId: string
+    invitedById: string
+  }
+) {
+  const { token, tokenHash } = createToken()
+  await tx.invitation.updateMany({
+    where: { organizationId: data.organizationId, email: data.email, status: "pending" },
+    data: { status: "revoked" },
+  })
+  const invitation = await tx.invitation.create({
+    data: {
+      ...data,
+      tokenHash,
+      expiresAt: new Date(Date.now() + INVITATION_DAYS * 24 * 60 * 60 * 1000),
+    },
+    select: { id: true },
+  })
+  const link = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/invite/${token}`
+  return { id: invitation.id, link }
+}
 
 /**
  * The invitation behind a link's token, if it can still be accepted: pending,
