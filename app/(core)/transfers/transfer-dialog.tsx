@@ -147,7 +147,7 @@ function TransferForm({
         </div>
         {inStock.length ? (
           // Lines picked from one warehouse don't carry over to another.
-          <ProductLines key={warehouseId} products={inStock} withCost={false} showOnHand />
+          <ProductLines key={warehouseId} products={inStock} showOnHand />
         ) : null}
         {!inStock.length && warehouse ? (
           <FieldDescription>Nothing is on hand in {warehouse.name} to send. Receive stock first.</FieldDescription>
