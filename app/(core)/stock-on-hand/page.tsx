@@ -59,7 +59,7 @@ async function StockOnHand({ searchParams }: Pick<PageProps<"/stock-on-hand">, "
   await connection();
   const member = await readActiveMember();
   if (!member) return <NoAccessState reason="no-organization" />;
-  if (!member.permissions.has("products.read")) return <NoAccessState reason="no-permission" />;
+  if (!member.permissions.has("stock.read")) return <NoAccessState reason="no-permission" />;
 
   const canSeeSalespeople = member.permissions.has("salespeople.read");
   const tab = canSeeSalespeople && (await searchParams).tab === "salespeople" ? "salespeople" : "products";
