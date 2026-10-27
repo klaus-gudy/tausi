@@ -32,7 +32,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import type { StockTransferStatus } from "@/lib/generated/prisma/client";
 import { formatCount, formatDate, formatTime } from "@/lib/format";
 import { activeWarehouses, stockByWarehouse } from "@/lib/inventory";
-import { currentPage } from "@/lib/list-size";
+import { currentPage, pageSize } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { COVERAGE, coverage } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
@@ -42,8 +42,6 @@ import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
 export const metadata: Metadata = {
   title: "Transfers",
 };
-
-const PAGE_SIZE = 25;
 
 const TABS = {
   initiated: ["initiated"],
@@ -120,15 +118,16 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
       .filter((row) => statuses.includes(row.status))
       .reduce((sum, row) => sum + row._count._all, 0);
   const total = count(TABS[tab]);
-  const page = currentPage(params.page, total, PAGE_SIZE);
+  const size = pageSize(params.size);
+  const page = currentPage(params.page, total, size);
 
   const [transfers, products, warehouses, stock, salespeople] = await Promise.all([
     prisma.stockTransfer.findMany({
       where: { organizationId, status: { in: TABS[tab] } },
       // Open transfers oldest first, so the ones waiting longest are on top.
       orderBy: isOpen ? { number: "asc" } : { number: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      skip: (page - 1) * size,
+      take: size,
       select: {
         id: true,
         number: true,
@@ -288,7 +287,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
               <TablePagination
                 page={page}
                 total={total}
-                pageSize={PAGE_SIZE}
+                pageSize={size}
                 params={tab === "initiated" ? {} : { tab }}
               />
             </CardContent>
