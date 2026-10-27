@@ -151,7 +151,7 @@ export async function signUp(
     select: {
       id: true,
       deletedAt: true,
-      authAccounts: { where: { provider: "password" }, select: { passwordHash: true } },
+      authAccounts: { select: { provider: true, passwordHash: true } },
       memberships: {
         where: {
           status: "active",
@@ -163,28 +163,42 @@ export async function signUp(
       },
     },
   });
+  // Someone invited has a user already, made when they were invited, but no
+  // way to sign in until they set a password here.
+  const invitedOnly = !!existing && !existing.authAccounts.length;
   if (existing) {
     if (existing.deletedAt) return error("This account has been closed.");
+    if (invitedOnly && !invitation) {
+      return error("This email has been invited to an organization. Use the invitation link to join.");
+    }
     if (!invitation && existing.memberships.length) {
       return error("This email already owns an organization. Log in instead.");
     }
-    const hash = existing.authAccounts[0]?.passwordHash;
-    const valid = hash ? await verifyPassword(password, hash) : await verifyNothing(password);
-    if (!valid) {
-      return error(
-        "An account with this email already exists. Enter its password to continue."
-      );
+    if (!invitedOnly) {
+      const hash = existing.authAccounts.find((account) => account.provider === "password")?.passwordHash;
+      const valid = hash ? await verifyPassword(password, hash) : await verifyNothing(password);
+      if (!valid) {
+        return error(
+          "An account with this email already exists. Enter its password to continue."
+        );
+      }
     }
   }
   if (!invitation && (await isOrganizationNameTaken(organizationName))) return taken;
 
-  const passwordHash = existing ? null : await hashPassword(password);
+  const passwordHash = !existing || invitedOnly ? await hashPassword(password) : null;
 
   // The user (if new), their sign-in method and their membership are created
   // together or not at all.
   const created = await prisma.$transaction(async (tx) => {
     let userId = existing?.id;
-    if (userId) {
+    if (userId && invitedOnly) {
+      // The name they give now replaces the one they were invited with.
+      await tx.user.update({ where: { id: userId }, data: { name, lastSignInAt: new Date() } });
+      await tx.authAccount.create({
+        data: { userId, provider: "password", providerAccountId: userId, passwordHash },
+      });
+    } else if (userId) {
       await tx.user.update({ where: { id: userId }, data: { lastSignInAt: new Date() } });
     } else {
       const user = await tx.user.create({
