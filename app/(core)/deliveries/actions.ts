@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { dealerScope } from "@/lib/dealer-access";
 import { dealerName } from "@/lib/dealers";
 import { deliveryNumber, heldStock, readOwnSalesperson } from "@/lib/deliveries";
 import { formatCount } from "@/lib/format";
@@ -93,13 +94,15 @@ export async function recordDelivery(
   const wanted = sumLines(lines);
 
   const organizationId = member.organization.id;
+  // Only dealers in the places they cover, unless they can see every dealer.
+  const scope = await dealerScope(member);
   const attempt = () =>
     getPrisma().$transaction(async (tx): Promise<ActionResult> => {
       // One delivery at a time per salesperson, so two can't spend the same units.
       await tx.$queryRaw`SELECT id FROM salespeople WHERE id = ${salesperson.id}::uuid FOR UPDATE`;
 
       const dealer = await tx.superDealer.findFirst({
-        where: { id: superDealerId, organizationId },
+        where: { ...scope, id: superDealerId },
         select: { shopName: true, contactName: true, deactivatedAt: true },
       });
       if (!dealer) return { message: "That dealer no longer exists." };
