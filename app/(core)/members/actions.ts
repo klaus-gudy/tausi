@@ -5,14 +5,13 @@ import { revalidatePath } from "next/cache";
 import { normalizePhone } from "@/lib/dealers";
 import { isEmail } from "@/lib/email";
 import { Prisma } from "@/lib/generated/prisma/client";
+import { createInvitation } from "@/lib/invitations";
 import { assignableRoles, readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
-import { createToken } from "@/lib/tokens";
 
 // Every action re-reads the session and membership: the page only hides
 // controls, it doesn't authorize anything.
 
-const INVITATION_DAYS = 7;
 const MAX_NAME = 100;
 
 type Result = { success?: boolean; message: string };
@@ -104,36 +103,24 @@ export async function inviteMember(
   });
   if (existing) return { message: `${email} is already a member.` };
 
-  const { token, tokenHash } = createToken();
+  let link: string;
   try {
-    await prisma.$transaction(async (tx) => {
-      // Inviting the same address again replaces the earlier link.
-      await tx.invitation.updateMany({
-        where: { organizationId, email, status: "pending" },
-        data: { status: "revoked" },
-      });
-      await tx.invitation.create({
-        data: {
-          organizationId,
-          email,
-          name: contact.name,
-          phone: contact.phone,
-          roleId: role.id,
-          tokenHash,
-          invitedById: member.userId,
-          expiresAt: new Date(Date.now() + INVITATION_DAYS * 24 * 60 * 60 * 1000),
-        },
-      });
-    });
+    ({ link } = await prisma.$transaction((tx) =>
+      createInvitation(tx, {
+        organizationId,
+        email,
+        name: contact.name,
+        phone: contact.phone,
+        roleId: role.id,
+        invitedById: member.userId,
+      })
+    ));
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { message: "That invitation was just sent. Try again in a moment." };
     }
     throw error;
   }
-
-  // No email is sent yet: the dialog shows the link for the inviter to share.
-  const link = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/invite/${token}`;
 
   revalidatePath("/members");
   return { success: true, message: `Invitation link created for ${email}.`, link, email };
