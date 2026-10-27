@@ -13,6 +13,7 @@ import {
 } from "@/lib/inventory";
 import { createInvitation } from "@/lib/invitations";
 import { assignableRoles, type ActiveMember } from "@/lib/membership";
+import { pickedCoverage } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 import { SALESPERSON_ROLE } from "@/lib/salespeople";
 
@@ -41,20 +42,14 @@ export async function saveSalesperson(
   const name = readText(formData.get("name"));
   const typedPhone = readText(formData.get("phone"), 40);
   const phone = typedPhone ? normalizePhone(typedPhone) : null;
-  const zoneKey = readText(formData.get("zoneKey"), 100);
   const notes = readText(formData.get("notes"), 1000);
   if (!name) return { message: "Enter the salesperson's name." };
   if (typedPhone && !phone) return { message: "Enter a phone number like 0754 123 456, or leave it empty." };
 
-  const organizationId = member.organization.id;
-  if (
-    zoneKey &&
-    !(await getPrisma().zone.findUnique({ where: { organizationId_key: { organizationId, key: zoneKey } } }))
-  ) {
-    return { message: "Pick the zone from the list." };
-  }
+  const covers = await pickedCoverage(member.organization.id, formData);
+  if ("message" in covers) return covers;
 
-  const person = { name, phone, zoneKey, notes };
+  const person = { name, phone, covers, notes };
   const result = id
     ? await editSalesperson(member, id, person)
     : await addSalesperson(
@@ -66,11 +61,17 @@ export async function saveSalesperson(
   return result;
 }
 
-type Person = { name: string; phone: string | null; zoneKey: string | null; notes: string | null };
+type Person = {
+  name: string;
+  phone: string | null;
+  /** The one place they cover: a zone, a region or a district. */
+  covers: { zoneKey: string | null; regionKey: string | null; districtId: string | null };
+  notes: string | null;
+};
 
 async function addSalesperson(
   member: ActiveMember,
-  { name, phone, zoneKey, notes }: Person,
+  { name, phone, covers, notes }: Person,
   email: string | null
 ): Promise<SalespersonResult> {
   if (!member.permissions.has("members.invite")) {
@@ -106,7 +107,7 @@ async function addSalesperson(
       });
       await tx.salesperson.update({
         where: { membershipId: invitation.membershipId },
-        data: { zoneKey, notes },
+        data: { ...covers, notes },
       });
       return invitation;
     });
@@ -123,7 +124,7 @@ async function addSalesperson(
 async function editSalesperson(
   member: ActiveMember,
   id: string,
-  { name, phone, zoneKey, notes }: Person
+  { name, phone, covers, notes }: Person
 ): Promise<SalespersonResult> {
   const prisma = getPrisma();
   const salesperson = await prisma.salesperson.findFirst({
@@ -134,7 +135,7 @@ async function editSalesperson(
   const { membership } = salesperson;
 
   await prisma.$transaction([
-    prisma.salesperson.update({ where: { id }, data: { zoneKey, notes } }),
+    prisma.salesperson.update({ where: { id }, data: { ...covers, notes } }),
     prisma.membership.update({ where: { id: membership.id }, data: { phone } }),
     prisma.user.update({ where: { id: membership.userId }, data: { name } }),
   ]);
