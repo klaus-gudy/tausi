@@ -331,10 +331,8 @@ model SuperDealer {
   // Stored as +255754123456; see lib/dealers.ts.
   phone           String?
   email           String?   @db.Citext
-  // The zone comes from the region.
-  regionKey       String?   @map("region_key")
-  // Must be in the region.
-  districtKey     String?   @map("district_key")
+  // Where they are; the region and zone come from the district.
+  districtId      String?   @map("district_id") @db.Uuid
   // Street, area or landmark within the district.
   address         String?
   // Where the shop is, from the salesperson's phone when onboarding.
@@ -360,13 +358,12 @@ model SuperDealer {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   onboardedBy    User?           @relation(fields: [onboardedById], references: [id], onDelete: SetNull)
   // Places are the organization's own, so the keys pair with organizationId.
-  region         Region?         @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
-  district       District?       @relation(fields: [organizationId, regionKey, districtKey], references: [organizationId, regionKey, key], onDelete: NoAction)
+  district       District?       @relation(fields: [districtId], references: [id], onDelete: NoAction)
   stockMovements StockMovement[]
   deliveries     Delivery[]
 
   @@unique([organizationId, shopName])
-  @@index([organizationId, regionKey])
+  @@index([districtId])
   @@map("super_dealers")
 }
 
@@ -376,10 +373,8 @@ model Warehouse {
   organizationId String    @map("organization_id") @db.Uuid
   // Unique among the organization's warehouses, ignoring case.
   name           String    @db.Citext
-  // The zone comes from the region.
-  regionKey      String?   @map("region_key")
-  // Must be in the region.
-  districtKey    String?   @map("district_key")
+  // Where it is; the region and zone come from the district.
+  districtId     String?   @map("district_id") @db.Uuid
   // Street, area or landmark within the district.
   address        String?
   // The storekeeper or manager to call.
@@ -393,14 +388,13 @@ model Warehouse {
 
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // Places are the organization's own, so the keys pair with organizationId.
-  region         Region?         @relation(fields: [organizationId, regionKey], references: [organizationId, key], onDelete: NoAction)
-  district       District?       @relation(fields: [organizationId, regionKey, districtKey], references: [organizationId, regionKey, key], onDelete: NoAction)
+  district       District?       @relation(fields: [districtId], references: [id], onDelete: NoAction)
   stockMovements StockMovement[]
   stockReceipts  StockReceipt[]
   stockTransfers StockTransfer[]
 
   @@unique([organizationId, name])
-  @@index([organizationId, regionKey])
+  @@index([districtId])
   @@map("warehouses")
 }
 
@@ -628,11 +622,9 @@ model Region {
   zoneKey        String @map("zone_key")
   name           String
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  zone         Zone          @relation(fields: [organizationId, zoneKey], references: [organizationId, key], onDelete: NoAction)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  zone         Zone         @relation(fields: [organizationId, zoneKey], references: [organizationId, key], onDelete: NoAction)
   districts    District[]
-  superDealers SuperDealer[]
-  warehouses   Warehouse[]
 
   @@id([organizationId, key])
   @@index([organizationId, zoneKey])
@@ -641,6 +633,8 @@ model Region {
 
 // Unique within its region only.
 model District {
+  // What warehouses and dealers point at; the keys below are for the place pickers.
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String @map("organization_id") @db.Uuid
   regionKey      String @map("region_key")
   key            String
@@ -651,7 +645,7 @@ model District {
   superDealers SuperDealer[]
   warehouses   Warehouse[]
 
-  @@id([organizationId, regionKey, key])
+  @@unique([organizationId, regionKey, key])
   @@map("districts")
 }
 
