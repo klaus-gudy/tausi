@@ -65,8 +65,9 @@ async function Zones() {
         orderBy: { name: "asc" },
         select: {
           name: true,
-          _count: {
-            select: { districts: true, superDealers: { where: { deactivatedAt: null } } },
+          // Dealers are placed by district, so they're counted through them.
+          districts: {
+            select: { _count: { select: { superDealers: { where: { deactivatedAt: null } } } } },
           },
         },
       },
@@ -96,8 +97,10 @@ async function Zones() {
 
   const rows = zones.map((zone) => ({
     ...zone,
-    districts: zone.regions.reduce((sum, region) => sum + region._count.districts, 0),
-    dealers: zone.regions.reduce((sum, region) => sum + region._count.superDealers, 0),
+    districts: zone.regions.reduce((sum, region) => sum + region.districts.length, 0),
+    dealers: zone.regions
+      .flatMap((region) => region.districts)
+      .reduce((sum, district) => sum + district._count.superDealers, 0),
   }));
   const total = (pick: (row: (typeof rows)[number]) => number) =>
     rows.reduce((sum, row) => sum + pick(row), 0);
