@@ -28,7 +28,7 @@ import {
 import { TabsContent } from "@/components/ui/tabs";
 import { formatPhone } from "@/lib/dealers";
 import { readActiveMember } from "@/lib/membership";
-import { readPlaces } from "@/lib/places";
+import { PLACE, placeKeys, readPlaces } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -71,13 +71,10 @@ async function Warehouses({
       select: {
         id: true,
         name: true,
-        regionKey: true,
-        districtKey: true,
         address: true,
         contactName: true,
         phone: true,
-        region: { select: { name: true, zone: { select: { name: true } } } },
-        district: { select: { name: true } },
+        ...PLACE,
       },
     }),
     prisma.warehouse.count({ where: { organizationId, deactivatedAt: null } }),
@@ -133,7 +130,9 @@ async function Warehouses({
                 </TableHeader>
                 <TableBody>
                   {warehouses.map((warehouse) => {
-                    const { region, district, ...editable } = warehouse;
+                    const { district, ...rest } = warehouse;
+                    const region = district?.region;
+                    const editable = { ...rest, ...placeKeys(warehouse) };
                     return (
                       <TableRow key={warehouse.id}>
                         <TableCell>
