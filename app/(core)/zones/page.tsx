@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/table";
 import { formatCount } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
+import { COVERAGE, coverage } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
-import { BY_NAME, SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 
 export const metadata: Metadata = {
   title: "Zones",
@@ -37,8 +37,8 @@ export default function ZonesPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Zones</h1>
         <p className="text-sm text-muted-foreground">
-          Tanzania&apos;s sales zones, set up with your organization. Salespeople cover a zone, and
-          dealers fall in one by their region.
+          Tanzania&apos;s sales zones, set up with your organization. Salespeople and dealers count
+          in the zone their region or district is in.
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
@@ -54,30 +54,31 @@ async function Zones() {
   if (!member) return <NoAccessState reason="no-organization" />;
   if (!member.permissions.has("dealers.read")) return <NoAccessState reason="no-permission" />;
 
-  // The zones come with the organization, so they're listed rather than added here.
-  const zones = await getPrisma().zone.findMany({
-    where: { organizationId: member.organization.id },
-    orderBy: { position: "asc" },
-    select: {
-      key: true,
-      name: true,
-      regions: {
-        orderBy: { name: "asc" },
-        select: {
-          name: true,
-          // Dealers are placed by district, so they're counted through them.
-          districts: {
-            select: { _count: { select: { superDealers: { where: { deactivatedAt: null } } } } },
+  const organizationId = member.organization.id;
+  const prisma = getPrisma();
+  const [zones, salespeople] = await Promise.all([
+    // The zones come with the organization, so they're listed rather than added here.
+    prisma.zone.findMany({
+      where: { organizationId },
+      orderBy: { position: "asc" },
+      select: {
+        key: true,
+        name: true,
+        regions: {
+          orderBy: { name: "asc" },
+          select: {
+            name: true,
+            // Dealers are placed by district, so they're counted through them.
+            districts: {
+              select: { _count: { select: { superDealers: { where: { deactivatedAt: null } } } } },
+            },
           },
         },
       },
-      salespeople: {
-        where: { deactivatedAt: null },
-        orderBy: BY_NAME,
-        select: { id: true, ...SALESPERSON_PERSON },
-      },
-    },
-  });
+    }),
+    // Salespeople cover a zone, a region or a district; each counts in its zone.
+    prisma.salesperson.findMany({ where: { organizationId, deactivatedAt: null }, select: COVERAGE }),
+  ]);
 
   if (!zones.length) {
     return (
@@ -95,9 +96,14 @@ async function Zones() {
     );
   }
 
+  const salespeopleIn = new Map<string, number>();
+  for (const salesperson of salespeople) {
+    const zoneKey = coverage(salesperson).zone?.key;
+    if (zoneKey) salespeopleIn.set(zoneKey, (salespeopleIn.get(zoneKey) ?? 0) + 1);
+  }
   const rows = zones.map((zone) => ({
     ...zone,
-    districts: zone.regions.reduce((sum, region) => sum + region.districts.length, 0),
+    salespeople: salespeopleIn.get(zone.key) ?? 0,
     dealers: zone.regions
       .flatMap((region) => region.districts)
       .reduce((sum, district) => sum + district._count.superDealers, 0),
@@ -113,8 +119,7 @@ async function Zones() {
             <TableRow>
               <TableHead>Zone</TableHead>
               <TableHead className="hidden md:table-cell">Regions</TableHead>
-              <TableHead className="hidden text-right sm:table-cell">Districts</TableHead>
-              <TableHead>Salespeople</TableHead>
+              <TableHead className="text-right">Salespeople</TableHead>
               <TableHead className="text-right">Super dealers</TableHead>
             </TableRow>
           </TableHeader>
@@ -130,16 +135,7 @@ async function Zones() {
                 <TableCell className="hidden max-w-sm whitespace-normal md:table-cell">
                   {zone.regions.map((region) => region.name).join(", ")}
                 </TableCell>
-                <TableCell className="hidden text-right tabular-nums sm:table-cell">
-                  {formatCount(zone.districts)}
-                </TableCell>
-                <TableCell className="whitespace-normal">
-                  {zone.salespeople.length ? (
-                    zone.salespeople.map((salesperson) => <div key={salesperson.id}>{salespersonName(salesperson)}</div>)
-                  ) : (
-                    <span className="text-muted-foreground">No one yet</span>
-                  )}
-                </TableCell>
+                <TableCell className="text-right tabular-nums">{formatCount(zone.salespeople)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCount(zone.dealers)}</TableCell>
               </TableRow>
             ))}
@@ -150,10 +146,9 @@ async function Zones() {
               <TableCell className="hidden md:table-cell">
                 {formatCount(total((row) => row.regions.length))} regions
               </TableCell>
-              <TableCell className="hidden text-right tabular-nums sm:table-cell">
-                {formatCount(total((row) => row.districts))}
+              <TableCell className="text-right tabular-nums">
+                {formatCount(total((row) => row.salespeople))}
               </TableCell>
-              <TableCell>{formatCount(total((row) => row.salespeople.length))}</TableCell>
               <TableCell className="text-right tabular-nums">
                 {formatCount(total((row) => row.dealers))}
               </TableCell>
