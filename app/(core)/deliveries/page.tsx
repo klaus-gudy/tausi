@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/table";
 import { byDealerName, dealerName } from "@/lib/dealers";
 import { deliveryNumber, heldStock, readOwnSalesperson } from "@/lib/deliveries";
-import { formatCount, formatDate, formatDay } from "@/lib/format";
+import { formatCount, formatDate, formatDay, formatTime } from "@/lib/format";
 import { shownCount } from "@/lib/list-size";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
@@ -121,7 +121,7 @@ async function OwnStock({
         number: true,
         status: true,
         reference: true,
-        initiatedOn: true,
+        createdAt: true,
         dispatchedAt: true,
         movements: {
           where: { type: "transferred" },
@@ -166,6 +166,7 @@ async function OwnStock({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Created at</TableHead>
                   <TableHead>Transfer</TableHead>
                   <TableHead>Products</TableHead>
                   <TableHead>Status</TableHead>
@@ -179,12 +180,15 @@ async function OwnStock({
                   const name = transferNumber(transfer.number);
                   return (
                     <TableRow key={transfer.id} className="align-top">
+                      <TableCell className="whitespace-nowrap">
+                        <div>{formatDate(transfer.createdAt)}</div>
+                        <div className="text-xs text-muted-foreground">{formatTime(transfer.createdAt)}</div>
+                      </TableCell>
                       <TableCell>
                         <div className="font-medium">{name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDay(transfer.initiatedOn)}
-                          {transfer.reference ? ` · ${transfer.reference}` : ""}
-                        </div>
+                        {transfer.reference ? (
+                          <div className="text-xs text-muted-foreground">{transfer.reference}</div>
+                        ) : null}
                       </TableCell>
                       <TableCell>
                         <ProductList lines={transfer.movements.map((line) => ({ ...line, quantity: -line.quantity }))} />
@@ -322,6 +326,7 @@ async function DeliveryList({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Delivered on</TableHead>
                   <TableHead>Delivery</TableHead>
                   {salespersonId ? null : <TableHead>Salesperson</TableHead>}
                   <TableHead>Super dealer</TableHead>
@@ -332,12 +337,12 @@ async function DeliveryList({
               <TableBody>
                 {deliveries.map((delivery) => (
                   <TableRow key={delivery.id} className="align-top">
+                    <TableCell className="whitespace-nowrap">{formatDay(delivery.deliveredOn)}</TableCell>
                     <TableCell>
                       <div className="font-medium">{deliveryNumber(delivery.number)}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatDay(delivery.deliveredOn)}
-                        {delivery.reference ? ` · ${delivery.reference}` : ""}
-                      </div>
+                      {delivery.reference ? (
+                        <div className="text-xs text-muted-foreground">{delivery.reference}</div>
+                      ) : null}
                     </TableCell>
                     {salespersonId ? null : <TableCell>{delivery.salesperson.name}</TableCell>}
                     <TableCell>{dealerName(delivery.superDealer)}</TableCell>
