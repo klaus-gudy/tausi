@@ -148,10 +148,19 @@ export async function setSalespersonActive(id: string, active: boolean): Promise
   if (!member) return notAllowed;
 
   const { count } = await getPrisma().salesperson.updateMany({
-    where: { id, organizationId: member.organization.id },
+    // Only someone who still has the Salesperson role can come back.
+    where: {
+      id,
+      organizationId: member.organization.id,
+      ...(active ? { membership: { role: { key: SALESPERSON_ROLE } } } : {}),
+    },
     data: { deactivatedAt: active ? null : new Date() },
   });
-  if (!count) return { message: "That salesperson no longer exists." };
+  if (!count) {
+    return active
+      ? { message: "They no longer have the Salesperson role. Give it back to them on Members." }
+      : { message: "That salesperson no longer exists." };
+  }
 
   revalidateSalespeople();
   return { success: true, message: active ? "Salesperson reactivated." : "Salesperson deactivated." };
