@@ -7,7 +7,8 @@ import { cn } from "cn"
  * per row. Pair it with the table wrapped in `hidden @4xl/main:block`.
  *
  * Cards are kept compact so a phone screen shows many rows: one line per
- * header line and per field, with long text cut off.
+ * header line and per field, with long text cut off. A card holding the list
+ * loses its own frame meanwhile (see globals.css).
  */
 export function MobileCards({
   className,
@@ -15,6 +16,7 @@ export function MobileCards({
 }: React.ComponentProps<"ul">) {
   return (
     <ul
+      data-slot="mobile-cards"
       className={cn(
         "grid gap-2 @xl/main:grid-cols-2 @4xl/main:hidden",
         className
@@ -75,7 +77,7 @@ export function MobileCardFields({
   return <dl className={cn("grid gap-1", className)} {...props} />
 }
 
-/** One line: the label on the left, its value on the right, cut off if long. */
+/** One line: the label on the left, its value on the right, each cut off if long. */
 export function MobileCardField({
   label,
   className,
@@ -89,7 +91,7 @@ export function MobileCardField({
     <div
       className={cn("flex min-w-0 items-center justify-between gap-3", className)}
     >
-      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dt className="max-w-[60%] shrink-0 truncate text-muted-foreground">{label}</dt>
       <dd className="min-w-0 truncate text-right">{children}</dd>
     </div>
   )
