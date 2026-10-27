@@ -109,6 +109,15 @@ export async function claimInvitation(
     const { roleId, name, phone } = invitation
     await tx.membership.create({ data: { organizationId, userId, roleId, name, phone } })
   }
+  // A salesperson added with this invitation now signs in as them, unless
+  // they already sign in as another salesperson there.
+  const linked = await tx.salesperson.findFirst({ where: { organizationId, userId }, select: { id: true } })
+  if (!linked) {
+    await tx.salesperson.updateMany({
+      where: { organizationId, invitationId: invitation.id, userId: null },
+      data: { userId },
+    })
+  }
   // Following the link sent to the address proves they own it.
   await tx.user.updateMany({
     where: { id: userId, emailVerifiedAt: null },
