@@ -3,6 +3,13 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { History } from "lucide-react";
 
+import {
+  MobileCard,
+  MobileCardField,
+  MobileCardFields,
+  MobileCardHeader,
+  MobileCards,
+} from "@/components/mobile-cards";
 import { NoAccessState } from "@/components/no-access-state";
 import { ProductName } from "@/components/product-name";
 import { TablePagination } from "@/components/table-pagination";
@@ -120,10 +127,49 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
     );
   }
 
+  const rows = movements.map((movement) => {
+    const warehouse: Party = { name: movement.warehouse?.name ?? "—" };
+    const other = counterpart(movement);
+    // Stock coming in is from the other side to the warehouse; going out, the reverse.
+    const [from, to] = movement.quantity > 0 ? [other, warehouse] : [warehouse, other];
+    const details = [
+      movement.reference ?? movement.receipt?.reference,
+      movement.note ?? movement.receipt?.note,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return { movement, from, to, details };
+  });
+
   return (
     <Card>
       <CardContent>
-        <Table>
+        <MobileCards>
+          {rows.map(({ movement, from, to, details }) => (
+            <MobileCard key={movement.id} className={movement.reversedBy ? "text-muted-foreground" : undefined}>
+              <MobileCardHeader
+                title={movement.product.name}
+                badge={<Badge variant={TYPE_BADGES[movement.type] ?? "outline"}>{TYPE_LABELS[movement.type]}</Badge>}
+                description={[
+                  movement.product.size,
+                  `${formatDate(movement.createdAt)}, ${formatTime(movement.createdAt)}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                aside={<Quantity quantity={movement.quantity} />}
+              />
+              <MobileCardFields>
+                <MobileCardField label="From">{partyLine(from)}</MobileCardField>
+                <MobileCardField label="To">{partyLine(to)}</MobileCardField>
+                <MobileCardField label="Recorded by">
+                  {movement.createdBy?.name || movement.createdBy?.email || "—"}
+                </MobileCardField>
+                {details ? <MobileCardField label="Note">{details}</MobileCardField> : null}
+              </MobileCardFields>
+            </MobileCard>
+          ))}
+        </MobileCards>
+        <Table className="hidden @4xl/main:table">
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
@@ -136,55 +182,41 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {movements.map((movement) => {
-              const warehouse: Party = { name: movement.warehouse?.name ?? "—" };
-              const other = counterpart(movement);
-              // Stock coming in is from the other side to the warehouse; going out, the reverse.
-              const [from, to] = movement.quantity > 0 ? [other, warehouse] : [warehouse, other];
-              const details = [
-                movement.reference ?? movement.receipt?.reference,
-                movement.note ?? movement.receipt?.note,
-              ]
-                .filter(Boolean)
-                .join(" · ");
-              return (
-                <TableRow key={movement.id} className={movement.reversedBy ? "text-muted-foreground" : undefined}>
-                  <TableCell className="whitespace-nowrap">
-                    <div>{formatDate(movement.createdAt)}</div>
-                    <div className="text-xs text-muted-foreground">{formatTime(movement.createdAt)}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={TYPE_BADGES[movement.type] ?? "outline"}>{TYPE_LABELS[movement.type]}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <ProductName name={movement.product.name} className="font-medium" />
-                      {movement.product.size ? (
-                        <span className="text-muted-foreground">{movement.product.size}</span>
-                      ) : null}
-                      {movement.reversedBy ? <Badge variant="outline">Reversed</Badge> : null}
-                    </div>
-                    {details ? (
-                      <div className="mt-1 max-w-xs truncate text-xs text-muted-foreground">{details}</div>
+            {rows.map(({ movement, from, to, details }) => (
+              <TableRow key={movement.id} className={movement.reversedBy ? "text-muted-foreground" : undefined}>
+                <TableCell className="whitespace-nowrap">
+                  <div>{formatDate(movement.createdAt)}</div>
+                  <div className="text-xs text-muted-foreground">{formatTime(movement.createdAt)}</div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={TYPE_BADGES[movement.type] ?? "outline"}>{TYPE_LABELS[movement.type]}</Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <ProductName name={movement.product.name} className="font-medium" />
+                    {movement.product.size ? (
+                      <span className="text-muted-foreground">{movement.product.size}</span>
                     ) : null}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <PartyCell party={from} />
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <PartyCell party={to} />
-                  </TableCell>
-                  <TableCell
-                    className={`text-right font-medium tabular-nums ${movement.quantity > 0 ? "text-emerald-700 dark:text-emerald-400" : ""}`}
-                  >
-                    {formatSigned(movement.quantity)}
-                  </TableCell>
-                  <TableCell className="hidden text-muted-foreground lg:table-cell">
-                    {movement.createdBy?.name || movement.createdBy?.email || "—"}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                    {movement.reversedBy ? <Badge variant="outline">Reversed</Badge> : null}
+                  </div>
+                  {details ? (
+                    <div className="mt-1 max-w-xs truncate text-xs text-muted-foreground">{details}</div>
+                  ) : null}
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <PartyCell party={from} />
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <PartyCell party={to} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Quantity quantity={movement.quantity} />
+                </TableCell>
+                <TableCell className="hidden text-muted-foreground lg:table-cell">
+                  {movement.createdBy?.name || movement.createdBy?.email || "—"}
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
         <TablePagination page={page} total={total} pageSize={size} />
@@ -212,6 +244,20 @@ function counterpart(movement: {
   // A count's difference, or undoing one, has no one on the other side.
   const type = movement.type === "reversal" ? movement.reverses?.type : movement.type;
   return { name: type === "adjustment" ? "Stock count" : "—" };
+}
+
+/** A party on one line, for a card: "Juma · TR-0012". */
+function partyLine(party: Party) {
+  return [party.name, party.detail].filter(Boolean).join(" · ");
+}
+
+/** The signed quantity, green when stock comes in. */
+function Quantity({ quantity }: { quantity: number }) {
+  return (
+    <span className={`font-medium tabular-nums ${quantity > 0 ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
+      {formatSigned(quantity)}
+    </span>
+  );
 }
 
 function PartyCell({ party }: { party: Party }) {
