@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { saveSalesperson, type SalespersonResult } from "./actions";
 import { CopyLink } from "@/components/copy-link";
 import { FormSection } from "@/components/form-section";
+import { PlaceFields } from "@/components/place-fields";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,16 +25,9 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useFormAction } from "@/hooks/use-form-action";
-import { formatPhone } from "@/lib/dealers";
+import { formatPhone, type PlaceZone } from "@/lib/dealers";
 
 /** A salesperson as the form edits them: name and email from their user, phone from their membership. */
 export type EditableSalesperson = {
@@ -41,22 +35,19 @@ export type EditableSalesperson = {
   name: string;
   email: string;
   phone: string | null;
+  /** What they cover, as the place pickers start from it. */
   zoneKey: string | null;
+  regionKey: string | null;
+  districtKey: string | null;
   notes: string | null;
 };
 
-export type ZoneOption = { key: string; name: string };
-
-
 const initialState: SalespersonResult = { message: "" };
-
-// Select items can't have an empty value, so "none" stands in for no choice.
-const NONE = "none";
 
 const DIALOG_CLASS = "max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl";
 
 /** The "Add salesperson" button and its dialog. */
-export function AddSalespersonDialog({ zones }: { zones: ZoneOption[] }) {
+export function AddSalespersonDialog({ places }: { places: PlaceZone[] }) {
   const [open, setOpen] = useState(false);
   // Remounting the form clears it for the next salesperson.
   const [formKey, setFormKey] = useState(0);
@@ -78,7 +69,7 @@ export function AddSalespersonDialog({ zones }: { zones: ZoneOption[] }) {
       <DialogContent className={DIALOG_CLASS}>
         <SalespersonForm
           key={formKey}
-          zones={zones}
+          places={places}
           onAnother={() => setFormKey((key) => key + 1)}
           onSaved={() => setOpen(false)}
         />
@@ -90,12 +81,12 @@ export function AddSalespersonDialog({ zones }: { zones: ZoneOption[] }) {
 /** Edits a salesperson; opened from their row menu. */
 export function EditSalespersonDialog({
   salesperson,
-  zones,
+  places,
   open,
   onOpenChange,
 }: {
   salesperson: EditableSalesperson;
-  zones: ZoneOption[];
+  places: PlaceZone[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -105,7 +96,7 @@ export function EditSalespersonDialog({
         {open ? (
           <SalespersonForm
             salesperson={salesperson}
-            zones={zones}
+            places={places}
             onSaved={() => onOpenChange(false)}
           />
         ) : null}
@@ -116,12 +107,12 @@ export function EditSalespersonDialog({
 
 function SalespersonForm({
   salesperson,
-  zones,
+  places,
   onAnother,
   onSaved,
 }: {
   salesperson?: EditableSalesperson;
-  zones: ZoneOption[];
+  places: PlaceZone[];
   onAnother?: () => void;
   onSaved: () => void;
 }) {
@@ -137,7 +128,6 @@ function SalespersonForm({
     },
     initialState
   );
-  const [zoneKey, setZoneKey] = useState(salesperson?.zoneKey ?? NONE);
 
   if (state.success && state.link) {
     return (
@@ -220,24 +210,16 @@ function SalespersonForm({
             </Field>
           </div>
         </FormSection>
-        <FormSection icon={MapPinned} title="Coverage" description="The zone they work in.">
-          <Field>
-            <FieldLabel htmlFor="salesperson-zone">Zone</FieldLabel>
-            <input type="hidden" name="zoneKey" value={zoneKey === NONE ? "" : zoneKey} />
-            <Select value={zoneKey} onValueChange={setZoneKey}>
-              <SelectTrigger id="salesperson-zone" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>No zone yet</SelectItem>
-                {zones.map((zone) => (
-                  <SelectItem key={zone.key} value={zone.key}>
-                    {zone.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+        <FormSection icon={MapPinned} title="Coverage" description="Where they work: a whole zone, or a region or district in it.">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <PlaceFields
+              places={places}
+              zoneKey={salesperson?.zoneKey ?? null}
+              regionKey={salesperson?.regionKey ?? null}
+              districtKey={salesperson?.districtKey ?? null}
+              idPrefix="salesperson"
+            />
+          </div>
           <Field>
             <FieldLabel htmlFor="salesperson-notes">
               Notes <span className="font-normal text-muted-foreground">(optional)</span>
