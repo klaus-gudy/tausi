@@ -275,6 +275,8 @@ model Invitation {
   role         Role         @relation(fields: [roleId], references: [id], onDelete: NoAction)
   invitedBy    User?        @relation("InvitationInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
   acceptedBy   User?        @relation("InvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  // The salesperson waiting on this invitation, if it was sent from Salespeople.
+  salesperson  Salesperson?
 
   // At most one open invitation per address per organization.
   @@unique([organizationId, email], map: "invitations_pending_email_key", where: raw("status = 'pending'"))
@@ -528,6 +530,8 @@ model Salesperson {
   zoneKey        String?   @map("zone_key")
   // The member who signs in as this salesperson.
   userId         String?   @map("user_id") @db.Uuid
+  // The invitation they were added with; accepting it fills in userId.
+  invitationId   String?   @unique @map("invitation_id") @db.Uuid
   notes          String?
   // Inactive salespeople keep their history but can't be sent stock.
   deactivatedAt  DateTime? @map("deactivated_at") @db.Timestamptz
@@ -538,6 +542,7 @@ model Salesperson {
   // Places are the organization's own, so the key pairs with organizationId.
   zone         Zone?           @relation(fields: [organizationId, zoneKey], references: [organizationId, key], onDelete: NoAction)
   user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  invitation   Invitation?     @relation(fields: [invitationId], references: [id], onDelete: SetNull)
   transfers    StockTransfer[]
   deliveries   Delivery[]
 
