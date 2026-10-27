@@ -202,8 +202,8 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Transfer</TableHead>
-                    <TableHead className="hidden sm:table-cell">Created at</TableHead>
+                    <TableHead>Created at</TableHead>
+                    <TableHead className="hidden sm:table-cell">Transfer</TableHead>
                     <TableHead className="hidden md:table-cell">From</TableHead>
                     <TableHead>To</TableHead>
                     <TableHead className="hidden md:table-cell">Products</TableHead>
@@ -222,14 +222,14 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                     return (
                       <TableRow key={transfer.id} className="align-top">
                         <TableCell className="whitespace-nowrap">
+                          <div>{formatDate(transfer.createdAt)}</div>
+                          <div className="text-xs text-muted-foreground">{formatTime(transfer.createdAt)}</div>
+                        </TableCell>
+                        <TableCell className="hidden whitespace-nowrap sm:table-cell">
                           <div className="font-medium">{name}</div>
                           {transfer.reference ? (
                             <div className="text-xs text-muted-foreground">{transfer.reference}</div>
                           ) : null}
-                        </TableCell>
-                        <TableCell className="hidden whitespace-nowrap sm:table-cell">
-                          <div>{formatDate(transfer.createdAt)}</div>
-                          <div className="text-xs text-muted-foreground">{formatTime(transfer.createdAt)}</div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">{transfer.warehouse.name}</TableCell>
                         <TableCell>
