@@ -36,6 +36,7 @@ import { formatCount, formatDate, formatDay, formatTime } from "@/lib/format";
 import { currentPage } from "@/lib/list-size";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
+import { SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
 
 export const metadata: Metadata = {
@@ -358,7 +359,7 @@ async function DeliveryList({
       deliveredOn: true,
       reference: true,
       note: true,
-      salesperson: { select: { name: true } },
+      salesperson: { select: SALESPERSON_PERSON },
       superDealer: { select: { shopName: true, contactName: true } },
       lines: {
         orderBy: { product: { name: "asc" } },
@@ -407,7 +408,7 @@ async function DeliveryList({
                     <div className="text-xs text-muted-foreground">{delivery.reference}</div>
                   ) : null}
                 </TableCell>
-                {salespersonId ? null : <TableCell>{delivery.salesperson.name}</TableCell>}
+                {salespersonId ? null : <TableCell>{salespersonName(delivery.salesperson)}</TableCell>}
                 <TableCell>{dealerName(delivery.superDealer)}</TableCell>
                 <TableCell className="hidden md:table-cell">
                   <ProductList lines={delivery.lines} />
