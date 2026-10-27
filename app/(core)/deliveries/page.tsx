@@ -109,7 +109,6 @@ async function Deliveries({ searchParams }: Pick<PageProps<"/deliveries">, "sear
         id: true,
         number: true,
         status: true,
-        reference: true,
         createdAt: true,
         dispatchedAt: true,
         movements: {
@@ -196,7 +195,6 @@ function Incoming({
     id: string;
     number: number;
     status: StockTransferStatus;
-    reference: string | null;
     createdAt: Date;
     dispatchedAt: Date | null;
     movements: { id: string; quantity: number; product: { name: string; size: string | null } }[];
@@ -242,9 +240,6 @@ function Incoming({
                   </TableCell>
                   <TableCell>
                     <div className="font-medium">{name}</div>
-                    {transfer.reference ? (
-                      <div className="text-xs text-muted-foreground">{transfer.reference}</div>
-                    ) : null}
                   </TableCell>
                   <TableCell>
                     <ProductList lines={transfer.movements.map((line) => ({ ...line, quantity: -line.quantity }))} />
