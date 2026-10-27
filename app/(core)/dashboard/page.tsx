@@ -40,6 +40,7 @@ import { heldStock, readOwnSalesperson } from "@/lib/deliveries";
 import { formatCompact, formatCount, formatDay, formatMoney } from "@/lib/format";
 import { readActiveMember, type ActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
+import { SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
 
 export const metadata: Metadata = {
@@ -103,10 +104,12 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
     readStuckTransfers(organizationId),
     showSalespeople ? readSalespeopleSupply(organizationId) : new Map(),
     showSalespeople
-      ? prisma.salesperson.findMany({
-          where: { organizationId, deactivatedAt: null },
-          select: { id: true, name: true },
-        })
+      ? prisma.salesperson
+          .findMany({
+            where: { organizationId, deactivatedAt: null },
+            select: { id: true, ...SALESPERSON_PERSON },
+          })
+          .then((rows) => rows.map((row) => ({ id: row.id, name: salespersonName(row) })))
       : [],
     prisma.superDealer.count({
       where: { organizationId, createdAt: { gte: windowStart() } },
@@ -245,7 +248,7 @@ async function BusinessMetrics({ member }: { member: ActiveMember }) {
                   {stuck.slice(0, 6).map((transfer) => (
                     <TableRow key={transfer.id}>
                       <TableCell className="font-medium">{transferNumber(transfer.number)}</TableCell>
-                      <TableCell>{transfer.salesperson.name}</TableCell>
+                      <TableCell>{salespersonName(transfer.salesperson)}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {TRANSFER_STATUS_LABELS[transfer.status]}
                       </TableCell>
