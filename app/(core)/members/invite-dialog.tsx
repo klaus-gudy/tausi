@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Check, Copy, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { inviteMember, type InviteState } from "./actions";
+import { CopyLink } from "@/components/copy-link";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -172,37 +173,5 @@ function InviteForm({
         </Button>
       </DialogFooter>
     </form>
-  );
-}
-
-function CopyLink({ link }: { link: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  return (
-    <div className="flex gap-2">
-      <Input value={link} readOnly aria-label="Invitation link" onFocus={(e) => e.target.select()} />
-      <Button
-        variant="outline"
-        size="icon"
-        aria-label="Copy link"
-        onClick={async () => {
-          if (!(await copy())) {
-            toast.error("Couldn't copy. Select the link and copy it instead.");
-          }
-        }}
-      >
-        {copied ? <Check /> : <Copy />}
-      </Button>
-    </div>
   );
 }
