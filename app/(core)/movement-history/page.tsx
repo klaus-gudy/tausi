@@ -27,7 +27,7 @@ import {
 import type { StockMovementType } from "@/lib/generated/prisma/client";
 import { dealerName } from "@/lib/dealers";
 import { formatDate, formatSigned, formatTime } from "@/lib/format";
-import { currentPage } from "@/lib/list-size";
+import { currentPage, pageSize } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 import { SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
@@ -36,8 +36,6 @@ import { transferNumber } from "@/lib/transfers";
 export const metadata: Metadata = {
   title: "Movement history",
 };
-
-const PAGE_SIZE = 25;
 
 // Stock coming in stands out, stock going out is quieter, the rest is plain.
 const TYPE_BADGES: Partial<Record<StockMovementType, "default" | "secondary">> = {
@@ -80,12 +78,14 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
   const where = { organizationId: member.organization.id, holder: "warehouse" as const };
   const prisma = getPrisma();
   const total = await prisma.stockMovement.count({ where });
-  const page = currentPage((await searchParams).page, total, PAGE_SIZE);
+  const params = await searchParams;
+  const size = pageSize(params.size);
+  const page = currentPage(params.page, total, size);
   const movements = await prisma.stockMovement.findMany({
     where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    skip: (page - 1) * PAGE_SIZE,
-    take: PAGE_SIZE,
+    skip: (page - 1) * size,
+    take: size,
     select: {
       id: true,
       type: true,
@@ -187,7 +187,7 @@ async function Movements({ searchParams }: Pick<PageProps<"/movement-history">, 
             })}
           </TableBody>
         </Table>
-        <TablePagination page={page} total={total} pageSize={PAGE_SIZE} />
+        <TablePagination page={page} total={total} pageSize={size} />
       </CardContent>
     </Card>
   );
