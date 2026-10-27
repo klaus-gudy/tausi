@@ -27,7 +27,6 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   Select,
   SelectContent,
@@ -367,23 +366,20 @@ function AdjustForm({
         />
         <Field>
           <FieldLabel htmlFor="adjust-product">Product</FieldLabel>
-          <NativeSelect
-            id="adjust-product"
-            name="productId"
-            value={productId}
-            onChange={(event) => setProductId(event.target.value)}
-            className="w-full"
-            required
-          >
-            <NativeSelectOption value="" disabled>
-              Pick a product
-            </NativeSelectOption>
-            {products.map((other) => (
-              <NativeSelectOption key={other.id} value={other.id}>
-                {other.name} ({other.code})
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          <input type="hidden" name="productId" value={productId} />
+          <Select value={productId} onValueChange={setProductId}>
+            <SelectTrigger id="adjust-product" className="w-full">
+              <SelectValue placeholder="Pick a product" />
+            </SelectTrigger>
+            <SelectContent>
+              {products.map((other) => (
+                <SelectItem key={other.id} value={other.id}>
+                  {other.name}
+                  <span className="text-muted-foreground">{other.code}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {product ? (
             <FieldDescription>
               The system shows {formatCount(product.onHand)} on hand
