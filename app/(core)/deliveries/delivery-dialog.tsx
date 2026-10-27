@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Truck } from "lucide-react";
 
 import { recordDelivery } from "./actions";
@@ -20,7 +21,13 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 export type DeliveryDealer = { id: string; name: string; place: string | null };
@@ -51,6 +58,7 @@ function DeliveryForm({
   onDone: () => void;
 }) {
   const [state, onSubmit, pending] = useDialogAction(recordDelivery, onDone);
+  const [dealerId, setDealerId] = useState("");
   const day = today();
 
   return (
@@ -63,23 +71,20 @@ function DeliveryForm({
         <div className="grid gap-5 sm:grid-cols-3">
           <Field>
             <FieldLabel htmlFor="delivery-dealer">Super dealer</FieldLabel>
-            <NativeSelect
-              id="delivery-dealer"
-              name="superDealerId"
-              defaultValue=""
-              className="w-full"
-              required
-            >
-              <NativeSelectOption value="" disabled>
-                Pick a dealer
-              </NativeSelectOption>
-              {dealers.map((dealer) => (
-                <NativeSelectOption key={dealer.id} value={dealer.id}>
-                  {dealer.name}
-                  {dealer.place ? ` · ${dealer.place}` : ""}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <input type="hidden" name="superDealerId" value={dealerId} />
+            <Select value={dealerId} onValueChange={setDealerId}>
+              <SelectTrigger id="delivery-dealer" className="w-full">
+                <SelectValue placeholder="Pick a dealer" />
+              </SelectTrigger>
+              <SelectContent>
+                {dealers.map((dealer) => (
+                  <SelectItem key={dealer.id} value={dealer.id}>
+                    {dealer.name}
+                    {dealer.place ? <span className="text-muted-foreground">{dealer.place}</span> : null}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
           <Field>
             <FieldLabel htmlFor="delivery-reference">Delivery note / receipt</FieldLabel>
