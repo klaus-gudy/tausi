@@ -14,7 +14,6 @@ import {
   plural,
   readDay,
   readLines,
-  readText,
   sumLines,
   type ActionResult,
 } from "@/lib/inventory";
@@ -49,8 +48,6 @@ export async function initiateTransfer(
   const lines = readLines(formData, false);
   if (typeof lines === "string") return { message: lines };
   const wanted = sumLines(lines);
-  const reference = readText(formData.get("reference"), 100);
-  const note = readText(formData.get("note"), 1000);
 
   const organizationId = member.organization.id;
   const attempt = () =>
@@ -89,8 +86,6 @@ export async function initiateTransfer(
           number,
           salespersonId,
           warehouseId: warehouse.id,
-          reference,
-          note,
           initiatedOn,
           createdById: member.userId,
           movements: {
@@ -102,7 +97,6 @@ export async function initiateTransfer(
               warehouseId: warehouse.id,
               quantity: -quantity,
               occurredOn: initiatedOn,
-              reference,
               createdById: member.userId,
             })),
           },
