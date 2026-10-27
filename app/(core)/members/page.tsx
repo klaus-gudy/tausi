@@ -86,13 +86,12 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
   const tab = canInvite && (await searchParams).tab === "invitations" ? "invitations" : "members";
 
   const prisma = getPrisma();
-  const [memberships, invitations, roles] = await Promise.all([
+  const [memberships, invited, invitations, roles] = await Promise.all([
     prisma.membership.findMany({
-      where: { organizationId: organization.id },
+      where: { organizationId: organization.id, status: { not: "invited" } },
       orderBy: { joinedAt: "asc" },
       select: {
         id: true,
-        name: true,
         phone: true,
         status: true,
         joinedAt: true,
@@ -100,24 +99,31 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
         role: { select: { id: true, key: true, name: true } },
       },
     }),
+    // People added but not joined yet: members already, waiting on their link.
     canInvite
-      ? prisma.invitation.findMany({
-          where: { organizationId: organization.id, status: "pending" },
-          orderBy: { createdAt: "desc" },
+      ? prisma.membership.findMany({
+          where: { organizationId: organization.id, status: "invited" },
+          orderBy: { joinedAt: "desc" },
           select: {
             id: true,
-            name: true,
-            email: true,
             phone: true,
-            expiresAt: true,
+            user: { select: { name: true, email: true } },
             role: { select: { name: true } },
             invitedBy: { select: { name: true, email: true } },
           },
         })
       : [],
+    canInvite
+      ? prisma.invitation.findMany({
+          where: { organizationId: organization.id, status: "pending" },
+          select: { email: true, expiresAt: true },
+        })
+      : [],
     assignableRoles(member),
   ]);
   const now = new Date();
+  // A link that ran out or was replaced leaves them without a pending one.
+  const expiry = new Map(invitations.map((invitation) => [invitation.email.toLowerCase(), invitation.expiresAt]));
   const invite = canInvite ? <InviteDialog roles={roles} /> : null;
 
   return (
@@ -126,7 +132,7 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
       tabs={[
         { value: "members", label: "Members", count: memberships.length },
         ...(canInvite
-          ? [{ value: "invitations", label: "Pending invitations", count: invitations.length }]
+          ? [{ value: "invitations", label: "Pending invitations", count: invited.length }]
           : []),
       ]}
       actions={{ members: invite, invitations: invite }}
@@ -149,7 +155,7 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
               <TableBody>
                 {memberships.map((row) => {
                   const self = row.id === member.membershipId;
-                  const name = row.name || row.user.name || row.user.email;
+                  const name = row.user.name || row.user.email;
                   const touchesOwner = row.role.key === "owner" && !isOwner;
                   // Only a role you could give them yourself can be changed.
                   const roleEditable = canUpdate && roles.some((role) => role.id === row.role.id);
@@ -209,7 +215,7 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
 
       {canInvite ? (
         <TabsContent value="invitations">
-          {invitations.length ? (
+          {invited.length ? (
             <Card>
               <CardContent>
                 <Table>
@@ -226,40 +232,38 @@ async function Members({ searchParams }: Pick<PageProps<"/members">, "searchPara
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {invitations.map((invitation) => (
-                      <TableRow key={invitation.id}>
-                        <TableCell>
-                          <div className="font-medium">{invitation.name || invitation.email}</div>
-                          <div className="text-xs text-muted-foreground md:hidden">
-                            {invitation.name ? invitation.email : null}
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <Contact email={invitation.email} phone={invitation.phone} />
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{invitation.role.name}</Badge>
-                        </TableCell>
-                        <TableCell className="hidden text-muted-foreground sm:table-cell">
-                          {invitation.invitedBy?.name || invitation.invitedBy?.email || "Someone"}
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          {invitation.expiresAt <= now ? (
-                            <Badge variant="destructive">Expired</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">
-                              {formatDate(invitation.expiresAt)}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <RevokeInvitationMenu
-                            invitationId={invitation.id}
-                            email={invitation.email}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {invited.map((row) => {
+                      const expiresAt = expiry.get(row.user.email.toLowerCase());
+                      return (
+                        <TableRow key={row.id}>
+                          <TableCell>
+                            <div className="font-medium">{row.user.name || row.user.email}</div>
+                            <div className="text-xs text-muted-foreground md:hidden">
+                              {row.user.name ? row.user.email : null}
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <Contact email={row.user.email} phone={row.phone} />
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{row.role.name}</Badge>
+                          </TableCell>
+                          <TableCell className="hidden text-muted-foreground sm:table-cell">
+                            {row.invitedBy?.name || row.invitedBy?.email || "Someone"}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            {!expiresAt || expiresAt <= now ? (
+                              <Badge variant="destructive">Expired</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">{formatDate(expiresAt)}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <RevokeInvitationMenu membershipId={row.id} email={row.user.email} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
