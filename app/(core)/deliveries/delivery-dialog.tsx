@@ -95,7 +95,7 @@ function DeliveryForm({
             <DatePicker id="delivery-day" name="deliveredOn" defaultValue={day} maxDate={day} />
           </Field>
         </div>
-        <ProductLines products={products} withCost={false} showOnHand onHandLabel="with you" />
+        <ProductLines products={products} showOnHand onHandLabel="with you" />
         <Field>
           <FieldLabel htmlFor="delivery-note">Note</FieldLabel>
           <Textarea id="delivery-note" name="note" maxLength={1000} rows={2} />
