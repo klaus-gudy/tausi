@@ -11,7 +11,7 @@ import {
   readText,
   type ActionResult,
 } from "@/lib/inventory";
-import { createInvitation } from "@/lib/invitations";
+import { addMember, createInvitation } from "@/lib/invitations";
 import { assignableRoles, type ActiveMember } from "@/lib/membership";
 import { pickedCoverage } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
@@ -28,8 +28,10 @@ export type SalespersonResult = ActionResult & { link?: string; email?: string }
 /**
  * Adds a salesperson, or edits one when the form carries its id. A
  * salesperson is a member with the Salesperson role plus the zone they
- * cover, so adding one invites them with that role; the link to share comes
- * back. Existing members become salespeople by getting the role on Members.
+ * cover, so adding one invites them with that role and the link to share
+ * comes back. "Add only" (intent=add) makes them an active member straight
+ * away, with no invitation to accept. Existing members become salespeople by
+ * getting the role on Members.
  */
 export async function saveSalesperson(
   _previous: SalespersonResult,
@@ -56,7 +58,8 @@ export async function saveSalesperson(
     : await addSalesperson(
         member,
         person,
-        readText(formData.get("email"))?.toLowerCase() ?? null
+        readText(formData.get("email"))?.toLowerCase() ?? null,
+        formData.get("intent") !== "add"
       );
   if (result.success) revalidateSalespeople();
   return result;
@@ -74,7 +77,8 @@ type Person = {
 async function addSalesperson(
   member: ActiveMember,
   { name, phone, covers, notes }: Person,
-  email: string | null
+  email: string | null,
+  invite: boolean
 ): Promise<SalespersonResult> {
   if (!member.permissions.has("members.invite")) {
     return { message: "Adding a salesperson makes them a member, so you need permission to invite people." };
@@ -98,23 +102,21 @@ async function addSalesperson(
   if (!role) return { message: "There's no Salesperson role you can give. Check Roles & permissions." };
   try {
     const { link } = await prisma.$transaction(async (tx) => {
+      const newMember = { organizationId, email, name, phone, roleId: role.id, invitedById: member.userId };
       // The Salesperson role brings their salesperson record with it.
-      const invitation = await createInvitation(tx, {
-        organizationId,
-        email,
-        name,
-        phone,
-        roleId: role.id,
-        invitedById: member.userId,
-      });
+      const added: { membershipId: string; link?: string } = invite
+        ? await createInvitation(tx, newMember)
+        : await addMember(tx, newMember, "active");
       await tx.salesperson.update({
-        where: { membershipId: invitation.membershipId },
+        where: { membershipId: added.membershipId },
         data: { ...covers, notes },
       });
-      return invitation;
+      return added;
     });
     revalidatePath("/members");
-    return { success: true, message: `${name} added and invited.`, link, email };
+    return link
+      ? { success: true, message: `${name} added and invited.`, link, email }
+      : { success: true, message: `${name} added as a member.` };
   } catch (error) {
     // Added twice at once: the second one finds the first's salesperson.
     if (isUniqueViolation(error)) return { message: `${email} was just added. Check the list.` };
