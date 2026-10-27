@@ -29,7 +29,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import { formatPhone } from "@/lib/dealers";
 import { heldStock } from "@/lib/deliveries";
 import { formatCount } from "@/lib/format";
-import { readActiveMember } from "@/lib/membership";
+import { assignableRoles, readActiveMember } from "@/lib/membership";
 import { getPrisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -62,10 +62,12 @@ async function Salespeople({
 
   const tab = (await searchParams).tab === "inactive" ? "inactive" : "active";
   const canManage = member.permissions.has("salespeople.manage");
+  // A new salesperson is invited as a member, so adding one takes both.
+  const canAdd = canManage && member.permissions.has("members.invite");
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [salespeople, activeCount, inactiveCount, onTheWay, held, supplied, zones, members] = await Promise.all([
+  const [salespeople, activeCount, inactiveCount, onTheWay, held, supplied, zones, members, roles] = await Promise.all([
     prisma.salesperson.findMany({
       where: { organizationId, deactivatedAt: tab === "inactive" ? { not: null } : null },
       orderBy: { name: "asc" },
@@ -79,6 +81,7 @@ async function Salespeople({
         notes: true,
         zone: { select: { name: true } },
         user: { select: { name: true, email: true } },
+        invitation: { select: { status: true, expiresAt: true } },
       },
     }),
     prisma.salesperson.count({ where: { organizationId, deactivatedAt: null } }),
@@ -111,6 +114,7 @@ async function Salespeople({
           select: { user: { select: { id: true, name: true, email: true } } },
         })
       : [],
+    canAdd ? assignableRoles(member) : [],
   ]);
   const sum = (rows: { salesperson_id: string; units: bigint }[], id: string) =>
     Number(rows.find((row) => row.salesperson_id === id)?.units ?? 0);
@@ -128,7 +132,7 @@ async function Salespeople({
         { value: "active", label: "Active", count: activeCount },
         { value: "inactive", label: "Inactive", count: inactiveCount },
       ]}
-      actions={canManage ? { active: <AddSalespersonDialog zones={zones} logins={logins} /> } : undefined}
+      actions={canAdd ? { active: <AddSalespersonDialog zones={zones} roles={roles} /> } : undefined}
     >
       <TabsContent value={tab}>
         {salespeople.length ? (
@@ -152,13 +156,19 @@ async function Salespeople({
                 </TableHeader>
                 <TableBody>
                   {salespeople.map((salesperson) => {
-                    const { zone, user, ...editable } = salesperson;
+                    const { zone, user, invitation, ...editable } = salesperson;
+                    const invited =
+                      invitation?.status === "pending" && invitation.expiresAt > new Date();
                     return (
                       <TableRow key={salesperson.id}>
                         <TableCell>
                           <div className="font-medium">{salesperson.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {user ? `Signs in as ${user.email}` : "No login"}
+                            {user
+                              ? `Signs in as ${user.email}`
+                              : invited
+                                ? "Invited, hasn't joined yet"
+                                : "No login"}
                           </div>
                           {salesperson.notes ? (
                             <div className="max-w-xs truncate text-xs text-muted-foreground">
@@ -215,9 +225,9 @@ async function Salespeople({
                   : "Add the field staff the store sends stock to."}
               </EmptyDescription>
             </EmptyHeader>
-            {tab === "active" && canManage ? (
+            {tab === "active" && canAdd ? (
               <EmptyContent>
-                <AddSalespersonDialog zones={zones} logins={logins} />
+                <AddSalespersonDialog zones={zones} roles={roles} />
               </EmptyContent>
             ) : null}
           </Empty>
