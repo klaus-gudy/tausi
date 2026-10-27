@@ -31,6 +31,7 @@ import { formatPhone } from "@/lib/dealers";
 import { heldStock } from "@/lib/deliveries";
 import { formatCount } from "@/lib/format";
 import { readActiveMember } from "@/lib/membership";
+import { COVERAGE, coverage, readPlaces } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 import { BY_NAME, SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 
@@ -69,15 +70,14 @@ async function Salespeople({
   const organizationId = member.organization.id;
 
   const prisma = getPrisma();
-  const [salespeople, activeCount, inactiveCount, onTheWay, held, supplied, zones] = await Promise.all([
+  const [salespeople, activeCount, inactiveCount, onTheWay, held, supplied, places] = await Promise.all([
     prisma.salesperson.findMany({
       where: { organizationId, deactivatedAt: tab === "inactive" ? { not: null } : null },
       orderBy: BY_NAME,
       select: {
         id: true,
-        zoneKey: true,
         notes: true,
-        zone: { select: { name: true } },
+        ...COVERAGE,
         ...SALESPERSON_PERSON,
       },
     }),
@@ -99,11 +99,7 @@ async function Salespeople({
       JOIN delivery_lines l ON l.delivery_id = d.id
       WHERE d.organization_id = ${organizationId}::uuid
       GROUP BY d.salesperson_id`,
-    canManage ? prisma.zone.findMany({
-          where: { organizationId },
-          orderBy: { position: "asc" },
-          select: { key: true, name: true },
-        }) : [],
+    canManage ? readPlaces(organizationId) : [],
   ]);
   const sum = (rows: { salesperson_id: string; units: bigint }[], id: string) =>
     Number(rows.find((row) => row.salesperson_id === id)?.units ?? 0);
@@ -117,7 +113,7 @@ async function Salespeople({
         { value: "active", label: "Active", count: activeCount },
         { value: "inactive", label: "Inactive", count: inactiveCount },
       ]}
-      actions={canAdd ? { active: <AddSalespersonDialog zones={zones} /> } : undefined}
+      actions={canAdd ? { active: <AddSalespersonDialog places={places} /> } : undefined}
     >
       <TabsContent value={tab}>
         {salespeople.length ? (
@@ -128,7 +124,7 @@ async function Salespeople({
                   <TableRow>
                     <TableHead>Salesperson</TableHead>
                     <TableHead className="hidden md:table-cell">Contact</TableHead>
-                    <TableHead className="hidden sm:table-cell">Zone</TableHead>
+                    <TableHead className="hidden sm:table-cell">Coverage</TableHead>
                     <TableHead className="hidden text-right lg:table-cell">On the way</TableHead>
                     <TableHead className="text-right">Holding</TableHead>
                     <TableHead className="hidden text-right sm:table-cell">Supplied</TableHead>
@@ -141,8 +137,9 @@ async function Salespeople({
                 </TableHeader>
                 <TableBody>
                   {salespeople.map((salesperson) => {
-                    const { membership, zone } = salesperson;
+                    const { membership } = salesperson;
                     const name = salespersonName(salesperson);
+                    const covers = coverage(salesperson);
                     return (
                       <TableRow key={salesperson.id}>
                         <TableCell>
@@ -162,8 +159,17 @@ async function Salespeople({
                             <div className="text-xs text-muted-foreground">{formatPhone(membership.phone)}</div>
                           ) : null}
                         </TableCell>
-                        <TableCell className="hidden text-muted-foreground sm:table-cell">
-                          {zone?.name ?? "—"}
+                        <TableCell className="hidden sm:table-cell">
+                          {covers.place ? (
+                            <>
+                              <div>{covers.place}</div>
+                              <div className="text-xs text-muted-foreground">{covers.zone?.name}</div>
+                            </>
+                          ) : (
+                            <span className={covers.zone ? undefined : "text-muted-foreground"}>
+                              {covers.zone?.name ?? "—"}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden text-right tabular-nums lg:table-cell">
                           {formatCount(sum(onTheWay, salesperson.id))}
@@ -182,10 +188,10 @@ async function Salespeople({
                                 name: membership.user.name ?? "",
                                 email: membership.user.email,
                                 phone: membership.phone,
-                                zoneKey: salesperson.zoneKey,
+                                ...covers.keys,
                                 notes: salesperson.notes,
                               }}
-                              zones={zones}
+                              places={places}
                               inactive={tab === "inactive"}
                             />
                           </TableCell>
@@ -214,7 +220,7 @@ async function Salespeople({
             </EmptyHeader>
             {tab === "active" && canAdd ? (
               <EmptyContent>
-                <AddSalespersonDialog zones={zones} />
+                <AddSalespersonDialog places={places} />
               </EmptyContent>
             ) : null}
           </Empty>
