@@ -36,20 +36,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { useFormAction } from "@/hooks/use-form-action";
 import { formatPhone } from "@/lib/dealers";
 
+/** A salesperson as the form edits them: name and email from their user, phone from their membership. */
 export type EditableSalesperson = {
   id: string;
   name: string;
+  email: string;
   phone: string | null;
-  email: string | null;
   zoneKey: string | null;
-  userId: string | null;
   notes: string | null;
 };
 
 export type ZoneOption = { key: string; name: string };
-
-/** A member whose login a salesperson can be linked to. */
-export type LoginOption = { userId: string; label: string };
 
 /** A role a new salesperson can be invited with. */
 export type RoleOption = { id: string; key: string; name: string };
@@ -104,13 +101,11 @@ export function AddSalespersonDialog({
 export function EditSalespersonDialog({
   salesperson,
   zones,
-  logins,
   open,
   onOpenChange,
 }: {
   salesperson: EditableSalesperson;
   zones: ZoneOption[];
-  logins: LoginOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -121,7 +116,6 @@ export function EditSalespersonDialog({
           <SalespersonForm
             salesperson={salesperson}
             zones={zones}
-            logins={logins}
             onSaved={() => onOpenChange(false)}
           />
         ) : null}
@@ -134,14 +128,12 @@ function SalespersonForm({
   salesperson,
   zones,
   roles = [],
-  logins = [],
   onAnother,
   onSaved,
 }: {
   salesperson?: EditableSalesperson;
   zones: ZoneOption[];
   roles?: RoleOption[];
-  logins?: LoginOption[];
   onAnother?: () => void;
   onSaved: () => void;
 }) {
@@ -158,7 +150,6 @@ function SalespersonForm({
     initialState
   );
   const [zoneKey, setZoneKey] = useState(salesperson?.zoneKey ?? NONE);
-  const [userId, setUserId] = useState(salesperson?.userId ?? NONE);
   const [roleId, setRoleId] = useState(
     (roles.find((role) => role.key === "salesperson") ?? roles[0])?.id ?? ""
   );
@@ -228,10 +219,8 @@ function SalespersonForm({
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="salesperson-email">
-                Email
-                {salesperson ? <span className="font-normal text-muted-foreground"> (optional)</span> : null}
-              </FieldLabel>
+              <FieldLabel htmlFor="salesperson-email">Email</FieldLabel>
+              {/* What they sign in with; it stays as invited. */}
               <Input
                 id="salesperson-email"
                 name="email"
@@ -240,39 +229,18 @@ function SalespersonForm({
                 placeholder="juma@example.com"
                 autoComplete="off"
                 maxLength={200}
-                required={!salesperson}
+                required
+                disabled={!!salesperson}
               />
             </Field>
           </div>
         </FormSection>
-        <FormSection
-          icon={KeyRound}
-          title="Sign-in"
-          description={
-            salesperson
-              ? "The member who signs in to acknowledge stock and supply dealers."
-              : "They're invited with the email above, and sign in to acknowledge stock and supply dealers."
-          }
-        >
-          {salesperson ? (
-            <Field>
-              <FieldLabel htmlFor="salesperson-login">Member</FieldLabel>
-              <input type="hidden" name="userId" value={userId === NONE ? "" : userId} />
-              <Select value={userId} onValueChange={setUserId}>
-                <SelectTrigger id="salesperson-login" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>No login</SelectItem>
-                  {logins.map((login) => (
-                    <SelectItem key={login.userId} value={login.userId}>
-                      {login.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          ) : (
+        {salesperson ? null : (
+          <FormSection
+            icon={KeyRound}
+            title="Sign-in"
+            description="They're invited with the email above, and sign in to acknowledge stock and supply dealers."
+          >
             <Field>
               <FieldLabel htmlFor="salesperson-role">Role</FieldLabel>
               <input type="hidden" name="roleId" value={roleId} />
@@ -289,11 +257,11 @@ function SalespersonForm({
                 </SelectContent>
               </Select>
               <FieldDescription>
-                Someone already on Members is linked straight away and keeps their role.
+                Someone already on Members becomes a salesperson straight away and keeps their role.
               </FieldDescription>
             </Field>
-          )}
-        </FormSection>
+          </FormSection>
+        )}
         <FormSection icon={MapPinned} title="Coverage" description="The zone they work in.">
           <Field>
             <FieldLabel htmlFor="salesperson-zone">Zone</FieldLabel>
