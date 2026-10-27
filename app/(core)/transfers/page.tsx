@@ -34,6 +34,7 @@ import { formatCount, formatDate, formatTime } from "@/lib/format";
 import { activeWarehouses, stockByWarehouse } from "@/lib/inventory";
 import { currentPage } from "@/lib/list-size";
 import { readActiveMember } from "@/lib/membership";
+import { COVERAGE, coverage } from "@/lib/places";
 import { getPrisma } from "@/lib/prisma";
 import { BY_NAME, SALESPERSON_PERSON, salespersonName } from "@/lib/salespeople";
 import { TRANSFER_STATUS_LABELS, transferNumber } from "@/lib/transfers";
@@ -137,7 +138,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
         arrivedAt: true,
         cancelledAt: true,
         acknowledgedAt: true,
-        salesperson: { select: { ...SALESPERSON_PERSON, zone: { select: { name: true } } } },
+        salesperson: { select: { ...SALESPERSON_PERSON, ...COVERAGE } },
         warehouse: { select: { name: true } },
         createdBy: { select: { name: true, email: true } },
         dispatchedBy: { select: { name: true, email: true } },
@@ -164,7 +165,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
       ? prisma.salesperson.findMany({
           where: { organizationId, deactivatedAt: null },
           orderBy: BY_NAME,
-          select: { id: true, ...SALESPERSON_PERSON, zone: { select: { name: true } } },
+          select: { id: true, ...SALESPERSON_PERSON, ...COVERAGE },
         })
       : [],
   ]);
@@ -188,7 +189,7 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                   salespeople={salespeople.map((salesperson) => ({
                     id: salesperson.id,
                     name: salespersonName(salesperson),
-                    zone: salesperson.zone?.name ?? null,
+                    zone: coverage(salesperson).zone?.name ?? null,
                   }))}
                 />
               ),
@@ -220,6 +221,8 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                   {transfers.map((transfer) => {
                     const units = transfer.movements.reduce((sum, line) => sum - line.quantity, 0);
                     const name = transferNumber(transfer.number);
+                    // Where the salesperson works, as finely as it's known.
+                    const to = coverage(transfer.salesperson);
                     return (
                       <TableRow key={transfer.id} className="align-top">
                         <TableCell className="whitespace-nowrap">
@@ -232,10 +235,8 @@ async function Transfers({ searchParams }: Pick<PageProps<"/transfers">, "search
                         <TableCell className="hidden md:table-cell">{transfer.warehouse.name}</TableCell>
                         <TableCell>
                           <div>{salespersonName(transfer.salesperson)}</div>
-                          {transfer.salesperson.zone ? (
-                            <div className="text-xs text-muted-foreground">
-                              {transfer.salesperson.zone.name}
-                            </div>
+                          {to.zone ? (
+                            <div className="text-xs text-muted-foreground">{to.place ?? to.zone.name}</div>
                           ) : null}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
